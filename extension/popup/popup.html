@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Tracker</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Job Tracker</h1>
+
+    <div id="loading" class="loading">
+      <p>Extracting job information...</p>
+    </div>
+
+    <div id="error" class="error" style="display: none;">
+      <p id="error-message"></p>
+    </div>
+
+    <form id="job-form" style="display: none;">
+      <div class="form-group">
+        <label for="job_role">Job Role *</label>
+        <input type="text" id="job_role" name="job_role" required>
+      </div>
+
+      <div class="form-group">
+        <label for="company_name">Company Name *</label>
+        <input type="text" id="company_name" name="company_name" required>
+      </div>
+
+      <div class="form-group">
+        <label for="location">Location</label>
+        <input type="text" id="location" name="location">
+      </div>
+
+      <div class="form-group">
+        <label for="date_applied">Date Applied *</label>
+        <input type="date" id="date_applied" name="date_applied" required>
+      </div>
+
+      <div class="form-group">
+        <label for="application_email">Application Email *</label>
+        <select id="application_email" name="application_email" required>
+          <option value="">Select email...</option>
+        </select>
+        <button type="button" id="add-email-btn" class="btn-link">+ Add New Email</button>
+      </div>
+
+      <div class="form-group" id="new-email-group" style="display: none;">
+        <label for="new_email">New Email</label>
+        <input type="email" id="new_email" name="new_email">
+        <button type="button" id="save-email-btn" class="btn-link">Save</button>
+      </div>
+
+      <div class="form-group">
+        <label for="application_platform">Application Platform *</label>
+        <select id="application_platform" name="application_platform" required>
+          <option value="LinkedIn">LinkedIn</option>
+          <option value="JobStreet">JobStreet</option>
+          <option value="Indeed">Indeed</option>
+          <option value="Company Website">Company Website</option>
+          <option value="Glints">Glints</option>
+          <option value="Kalibrr">Kalibrr</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="employment_type">Employment Type *</label>
+        <select id="employment_type" name="employment_type" required>
+          <option value="">Select type...</option>
+          <option value="Internship">Internship</option>
+          <option value="Full Time">Full Time</option>
+          <option value="Part Time">Part Time</option>
+          <option value="Contract">Contract</option>
+          <option value="Freelance">Freelance</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="salary_range">Salary Range</label>
+        <input type="text" id="salary_range" name="salary_range">
+      </div>
+
+      <div class="form-group">
+        <label for="job_description">Job Description *</label>
+        <textarea id="job_description" name="job_description" rows="4" required></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="job_url">Job URL</label>
+        <input type="url" id="job_url" name="job_url" readonly>
+      </div>
+
+      <div class="form-group">
+        <label for="status">Status</label>
+        <input type="text" id="status" name="status" value="Applied" readonly>
+      </div>
+
+      <div class="form-group">
+        <label for="notes">Notes</label>
+        <textarea id="notes" name="notes" rows="2"></textarea>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" id="cancel-btn" class="btn btn-secondary">Cancel</button>
+        <button type="submit" id="save-btn" class="btn btn-primary">Confirm & Save</button>
+      </div>
+    </form>
+
+    <div id="duplicate-warning" style="display: none;">
+      <p>This job has already been saved.</p>
+      <div class="form-actions">
+        <button type="button" id="cancel-duplicate-btn" class="btn btn-secondary">Cancel</button>
+        <button type="button" id="force-save-btn" class="btn btn-primary">Save Anyway</button>
+      </div>
+    </div>
+
+    <div id="success" style="display: none;">
+      <p>Application saved successfully!</p>
+    </div>
+  </div>
+
+  <script src="../scripts/utils/storage.js"></script>
+  <script src="../scripts/utils/platform.js"></script>
+  <script src="../scripts/utils/validator.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
