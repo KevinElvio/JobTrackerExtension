@@ -4,7 +4,7 @@
 > **Document Status:** Final MVP Specification  
 > **Scope:** Personal use, Google Chrome only  
 > **Backend:** Python + FastAPI  
-> **Primary Storage:** Google Sheets  
+> **Primary Storage:** Local CSV file  
 > **Local Storage:** `chrome.storage.local` for application-email configuration only
 
 ---
@@ -13,7 +13,7 @@
 
 **Job Tracker Browser Extension** adalah Chrome Extension personal untuk membantu mencatat lowongan pekerjaan yang telah dilamar.
 
-Sistem mengambil informasi publik yang tersedia pada halaman lowongan melalui DOM, menampilkan hasil extraction kepada user untuk diperiksa dan diperbaiki, kemudian mengirim data yang sudah dikonfirmasi ke backend FastAPI. Backend melakukan validation, sanitization, duplicate detection, dan menyimpan record ke satu Google Sheet.
+Sistem mengambil informasi publik yang tersedia pada halaman lowongan melalui DOM, menampilkan hasil extraction kepada user untuk diperiksa dan diperbaiki, kemudian mengirim data yang sudah dikonfirmasi ke backend FastAPI. Backend melakukan validation, sanitization, duplicate detection, dan menyimpan record ke file CSV lokal.
 
 Sistem bukan recruitment-management platform penuh. Fokus MVP adalah **pencatatan aplikasi pekerjaan** secara cepat, terstruktur, dan konsisten.
 
@@ -22,10 +22,9 @@ Sistem bukan recruitment-management platform penuh. Fokus MVP adalah **pencatata
 1. Mengurangi input manual ketika mencatat lamaran.
 2. Mengambil informasi lowongan yang tersedia secara publik dari DOM.
 3. Memberikan review sebelum data disimpan.
-4. Menyimpan data lamaran dalam satu Google Sheet.
+4. Menyimpan data lamaran dalam file CSV lokal.
 5. Menyediakan konfigurasi beberapa email aplikasi secara lokal.
 6. Mencegah duplicate secara tidak sengaja melalui warning.
-7. Menjaga credential Google tetap berada di backend.
 
 ## 1.2 Batasan MVP
 
@@ -33,7 +32,7 @@ Sistem bukan recruitment-management platform penuh. Fokus MVP adalah **pencatata
 - Hanya satu user/personal.
 - Tidak ada user registration/login.
 - Tidak menggunakan PostgreSQL/MySQL.
-- Google Sheets adalah persistent storage utama.
+- CSV file adalah persistent storage utama.
 - Tidak ada offline queue untuk data lowongan.
 - Tidak ada fitur update status dari extension.
 - Backend dijalankan secara lokal terlebih dahulu.
@@ -74,7 +73,7 @@ Confirm & Save
     ↓
 FastAPI
     ↓
-Google Sheets
+CSV File
 ```
 
 ## 2.3 Application Email
@@ -82,7 +81,6 @@ Google Sheets
 User dapat mempunyai beberapa email aplikasi.
 
 - Disimpan di `chrome.storage.local`.
-- Tidak disimpan sebagai konfigurasi di Google Sheets.
 - Dapat ditambahkan melalui extension.
 - Ditampilkan sebagai dropdown.
 - Email terpilih dikirim dalam application payload.
@@ -136,7 +134,7 @@ MVP hanya menggunakan `Date Applied`; tidak ada `Date Saved`.
 
 ## 2.7 Status
 
-Status disimpan di Google Sheets menggunakan dropdown:
+Status disimpan di CSV menggunakan dropdown:
 
 ```text
 Applied
@@ -149,14 +147,14 @@ Withdrawn
 
 `Applied` menjadi default ketika record dibuat melalui action Applied.
 
-Status tidak dikelola melalui fitur update extension pada MVP dan dapat diubah manual di Google Sheets.
+Status tidak dikelola melalui fitur update extension pada MVP dan dapat diubah manual di CSV.
 
 ## 2.8 Job URL
 
 - Diambil otomatis dari `window.location.href`.
 - Ditampilkan pada review form.
 - Read-only.
-- Tetap disimpan pada Google Sheets.
+- Tetap disimpan pada CSV.
 
 ---
 
@@ -287,7 +285,7 @@ backend/
 │   │   └── application.py
 │   ├── services/
 │   │   ├── application_service.py
-│   │   ├── google_sheets.py
+│   │   ├── csv_storage.py
 │   │   ├── duplicate_checker.py
 │   │   └── sanitizer.py
 │   └── core/
@@ -310,8 +308,8 @@ FastAPI bertanggung jawab untuk:
 3. Sanitization.
 4. Normalization.
 5. Duplicate checking.
-6. Google Sheets read.
-7. Google Sheets append.
+6. CSV read.
+7. CSV append.
 8. Error handling.
 9. Consistent API responses.
 
@@ -424,9 +422,9 @@ Duplicate tidak meng-update record lama.
 
 ---
 
-# 8. Google Sheets Schema
+# 8. CSV Schema
 
-Satu sheet digunakan untuk job applications.
+Satu file CSV digunakan untuk job applications.
 
 | Column | Field | Type | Required | Example |
 |---|---|---|---|---|
@@ -448,7 +446,7 @@ Application ID dibuat oleh backend dan tidak bergantung pada nomor baris.
 
 ---
 
-# 9. Google Sheets Integration
+# 9. CSV Storage Integration
 
 Flow:
 
@@ -459,12 +457,9 @@ Chrome Extension
         ▼
      FastAPI
         │
-        │ Service Account
+        │ Python csv module
         ▼
-Google Sheets API
-        │
-        ▼
-Google Sheet
+   CSV File
 ```
 
 Sebelum append:
@@ -481,7 +476,7 @@ Compare submitted URL
 Duplicate / Unique
 ```
 
-Jika unique, backend menggunakan Google Sheets API untuk append row.
+Jika unique, backend menggunakan Python csv module untuk append row.
 
 Google Service Account private key hanya berada di backend.
 
@@ -567,7 +562,7 @@ Backend melakukan:
 - Normalize line breaks.
 - Remove unnecessary HTML.
 - Enforce maximum text size.
-- Protect against spreadsheet formula injection.
+- Protect against CSV injection.
 
 Input seperti:
 
@@ -690,18 +685,16 @@ Application was not saved
 401 Unauthorized
 ```
 
-## Google Sheets Error
+## CSV Error
 
 Backend menangani:
 
-- Invalid Service Account.
-- Spreadsheet permission error.
-- Invalid Spreadsheet ID.
-- Google API unavailable.
-- Request timeout.
+- File not found.
+- Permission error.
+- Write error.
+- Encoding error.
 
-Credential tidak boleh dikirim ke extension.
-
+CSV file dibuat otomatis jika belum ada.
 ---
 
 # 17. Security
@@ -712,16 +705,14 @@ Credential tidak boleh dikirim ke extension.
 Authorization: Bearer <API_TOKEN>
 ```
 
-## FastAPI → Google
+## FastAPI → CSV
 
-Menggunakan Google Service Account.
+Menggunakan Python csv module untuk membaca dan menulis file CSV lokal.
 
 ## Environment Variables
 
 ```env
-GOOGLE_SPREADSHEET_ID=...
-GOOGLE_SERVICE_ACCOUNT_EMAIL=...
-GOOGLE_PRIVATE_KEY=...
+CSV_FILE_PATH=./data/applications.csv
 API_TOKEN=...
 ```
 
@@ -735,7 +726,7 @@ Karena extension bersifat client-side, API token yang ditanam di extension tidak
 
 # 18. Status Management
 
-Status dropdown di Google Sheets:
+Status dropdown di CSV:
 
 ```text
 Applied
@@ -758,14 +749,10 @@ Tidak ada endpoint update status pada MVP.
 
 # 19. Development Phases
 
-## Phase 1 — Google Sheets
+## Phase 1 — Setup
 
-1. Buat spreadsheet.
-2. Buat sheet Applications.
-3. Tambahkan header.
-4. Buat dropdown Status.
-5. Buat Service Account.
-6. Berikan akses spreadsheet kepada Service Account.
+1. Buat direktori `backend/data/`.
+2. Pastikan CSV file akan dibuat otomatis.
 
 ## Phase 2 — FastAPI
 
@@ -774,7 +761,7 @@ Tidak ada endpoint update status pada MVP.
 3. Authentication.
 4. Pydantic schema.
 5. `POST /api/applications`.
-6. Google Sheets service.
+6. CSV storage service.
 7. Duplicate checker.
 8. Sanitizer.
 
@@ -821,7 +808,7 @@ Tidak ada endpoint update status pada MVP.
 2. Validation tests.
 3. Sanitization tests.
 4. Duplicate tests.
-5. Google Sheets integration.
+5. CSV storage integration.
 6. End-to-end browser testing.
 
 ---
@@ -882,7 +869,7 @@ FastAPI available
 FastAPI unavailable
     → Error
 
-Google API unavailable
+CSV write error
     → Error
 ```
 
@@ -911,17 +898,16 @@ No job data is persisted locally after failure.
 - [ ] Request menggunakan Bearer token.
 - [ ] FastAPI melakukan server-side validation.
 - [ ] FastAPI melakukan sanitization.
-- [ ] Backend menggunakan Google Service Account.
-- [ ] Backend membaca Google Sheets sebelum append.
+- [ ] Backend menggunakan CSV file lokal.
+- [ ] Backend membaca CSV sebelum append.
 - [ ] Duplicate URL menghasilkan warning.
 - [ ] User dapat memilih `Save Anyway`.
 - [ ] Duplicate yang dipaksa tetap menjadi record baru.
-- [ ] Google Sheets menerima record baru.
+- [ ] CSV file menerima record baru.
 - [ ] Job data tidak disimpan lokal ketika network gagal.
 - [ ] Job Description maksimum 10.000 karakter.
-- [ ] Status tersedia sebagai dropdown di Google Sheets.
+- [ ] Status tersedia sebagai dropdown di CSV.
 - [ ] Backend dapat dijalankan secara lokal.
-
 ---
 
 # 22. Non-Functional Requirements
@@ -931,7 +917,7 @@ No job data is persisted locally after failure.
 - Extraction tidak boleh membuat UI popup menjadi tidak responsif.
 - API request dilakukan secara asynchronous.
 - Tidak ada kebutuhan high-throughput karena sistem personal.
-- Bottleneck utama diperkirakan berasal dari network dan Google Sheets API, bukan local FastAPI processing.
+- Bottleneck utama diperkirakan berasal dari network (extension → backend), bukan local FastAPI processing atau CSV I/O.
 
 ## Maintainability
 
@@ -944,7 +930,7 @@ No job data is persisted locally after failure.
 ## Reliability
 
 - Network failure menghasilkan error yang jelas.
-- Google API failure tidak mengekspos credential.
+- CSV write failure tidak mengekspos sensitive data.
 - Duplicate tidak langsung membuat record tanpa konfirmasi user.
 
 ## Security
@@ -952,8 +938,7 @@ No job data is persisted locally after failure.
 - Service Account hanya berada di backend.
 - `.env` tidak masuk repository.
 - Server-side validation wajib dilakukan.
-- Spreadsheet input disanitasi.
-
+- CSV input disanitasi.
 ---
 
 # 23. Final Architecture
@@ -975,13 +960,13 @@ No job data is persisted locally after failure.
                     │ Validation          │
                     │ Sanitization        │
                     │ Duplicate Check     │
-                    │ Google API Service  │
+                    │ CSV Service         │
                     └──────────┬──────────┘
                                │
-                               │ Service Account
+                               │ Python csv module
                                ▼
                     ┌─────────────────────┐
-                    │   Google Sheets     │
+                    │   CSV File          │
                     │                     │
                     │ Job Applications    │
                     └─────────────────────┘
@@ -1005,8 +990,7 @@ No job data is persisted locally after failure.
 | API Framework | FastAPI |
 | Validation | Pydantic |
 | Extension → Backend Auth | Bearer API Token |
-| Backend → Google Auth | Service Account |
-| Persistent Storage | Google Sheets |
+| Persistent Storage | Local CSV file |
 | Local Configuration | `chrome.storage.local` |
 | Initial Deployment | Localhost |
 | Additional Database | None |
@@ -1059,13 +1043,13 @@ Chrome Extension
        ↓
 FastAPI
        ↓
-Google Sheets
+CSV File
 ```
 
 Extension bertanggung jawab terhadap pengambilan informasi publik dari halaman, review, editing, dan konfigurasi email.
 
-FastAPI bertanggung jawab terhadap authentication, validation, sanitization, duplicate detection, dan integrasi Google Sheets.
+FastAPI bertanggung jawab terhadap authentication, validation, sanitization, duplicate detection, dan penyimpanan ke CSV file lokal.
 
-Google Sheets menjadi single source of persistent job application records, sedangkan `chrome.storage.local` hanya menyimpan konfigurasi email.
+CSV file menjadi single source of persistent job application records, sedangkan `chrome.storage.local` hanya menyimpan konfigurasi email.
 
-Arsitektur sengaja tidak menggunakan database tambahan atau offline queue agar kompleksitas MVP tetap rendah, tetapi struktur kode tetap modular sehingga fitur dapat dikembangkan setelah versi pertama stabil.
+Arsitektur sengaja tidak menggunakan database atau cloud storage agar kompleksitas MVP tetap rendah, tetapi struktur kode tetap modular sehingga fitur dapat dikembangkan setelah versi pertama stabil.

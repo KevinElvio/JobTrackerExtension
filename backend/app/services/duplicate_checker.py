@@ -1,12 +1,12 @@
-from app.services.google_sheets import get_all_urls
+from app.services.csv_storage import get_all_records
 
 
 def check_duplicate(job_url: str) -> dict | None:
-    existing_records = get_all_urls()
-    for record in existing_records:
-        if record["job_url"] == job_url:
+    records = get_all_records()
+    for record in records:
+        if record.get("job_url") == job_url:
             return {
-                "application_id": record["application_id"],
-                "job_url": record["job_url"],
+                "application_id": record.get("application_id", ""),
+                "job_url": record.get("job_url", ""),
             }
     return None

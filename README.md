@@ -1,11 +1,11 @@
 # Job Tracker Extension
 
-Chrome Extension personal untuk mencatat lowongan pekerjaan yang telah dilamar ke Google Sheets.
+Chrome Extension personal untuk mencatat lowongan pekerjaan yang telah dilamar ke file CSV lokal.
 
 ## Architecture
 
 ```
-Chrome Extension → FastAPI → Google Sheets
+Chrome Extension → FastAPI → CSV File
 ```
 
 ## Tech Stack
@@ -16,53 +16,32 @@ Chrome Extension → FastAPI → Google Sheets
 | Extension | Chrome Manifest V3 |
 | UI | HTML + CSS + JavaScript |
 | Backend | Python + FastAPI |
-| Storage | Google Sheets |
+| Storage | Local CSV file |
 
 ## Prerequisites
 
 - Google Chrome
 - Docker & Docker Compose
-- Google Cloud Project with:
-  - Google Sheets API enabled
-  - Service Account created
-  - Service Account JSON key file
 
 ## Setup
 
-### 1. Google Sheets Setup
-
-1. Create a new Google Spreadsheet
-2. Copy the Spreadsheet ID from the URL
-3. Create a Service Account in Google Cloud Console
-4. Download the Service Account JSON key
-5. Share the spreadsheet with the Service Account email
-6. Set environment variables in `backend/.env`:
+### 1. Backend Setup
 
 ```bash
-cp backend/.env.example backend/.env
+cd backend
+cp .env.example .env
 ```
 
 Edit `backend/.env`:
 
 ```
-GOOGLE_SPREADSHEET_ID=your_spreadsheet_id
-GOOGLE_SERVICE_ACCOUNT_EMAIL=your_service_account@project.iam.gserviceaccount.com
-GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_KEY\n-----END PRIVATE KEY-----"
+CSV_FILE_PATH=./data/applications.csv
 API_TOKEN=your_random_api_token
 ```
 
-7. Run the setup script to create headers and dropdowns:
+Start the backend:
 
 ```bash
-cd scripts
-pip install -r ../backend/requirements.txt
-python setup_google.py
-```
-
-### 2. Backend Setup
-
-```bash
-cd backend
 docker compose up -d
 ```
 
@@ -74,14 +53,14 @@ Test with:
 curl http://localhost:8000/health
 ```
 
-### 3. Extension Setup
+### 2. Extension Setup
 
 1. Open Chrome and go to `chrome://extensions/`
 2. Enable "Developer mode"
 3. Click "Load unpacked"
 4. Select the `extension/` folder
 
-### 4. Configure API Token
+### 3. Configure API Token
 
 Edit `extension/popup/popup.js` and replace `YOUR_API_TOKEN_HERE` with your actual API token.
 
@@ -148,23 +127,23 @@ Content-Type: application/json
 }
 ```
 
-## Google Sheets Schema
+## CSV Schema
 
-| Column | Field | Type |
-|--------|-------|------|
-| A | Application ID | String |
-| B | Job Role | String |
-| C | Company Name | String |
-| D | Location | String |
-| E | Date Applied | Date |
-| F | Application Email | String |
-| G | Application Platform | String |
-| H | Employment Type | Enum |
-| I | Salary Range | String |
-| J | Job Description | Text |
-| K | Job URL | URL |
-| L | Status | Enum |
-| M | Notes | Text |
+| Field | Type |
+|-------|------|
+| application_id | String |
+| job_role | String |
+| company_name | String |
+| location | String |
+| date_applied | Date |
+| application_email | String |
+| application_platform | String |
+| employment_type | Enum |
+| salary_range | String |
+| job_description | Text |
+| job_url | URL |
+| status | Enum |
+| notes | Text |
 
 ## Development
 

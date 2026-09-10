@@ -1,9 +1,8 @@
 import uuid
-from datetime import date
 
 from app.schemas.application import ApplicationCreate
+from app.services.csv_storage import append_row
 from app.services.duplicate_checker import check_duplicate
-from app.services.google_sheets import append_row
 from app.services.sanitizer import sanitize_application
 
 
@@ -32,21 +31,21 @@ def create_application(data: ApplicationCreate) -> dict:
 
     application_id = generate_application_id()
 
-    row = [
-        application_id,
-        app_data.get("job_role", ""),
-        app_data.get("company_name", ""),
-        app_data.get("location", ""),
-        str(data.date_applied),
-        app_data.get("application_email", ""),
-        app_data.get("application_platform", ""),
-        data.employment_type.value,
-        app_data.get("salary_range", ""),
-        app_data.get("job_description", ""),
-        job_url,
-        data.status.value,
-        app_data.get("notes", ""),
-    ]
+    row = {
+        "application_id": application_id,
+        "job_role": app_data.get("job_role", ""),
+        "company_name": app_data.get("company_name", ""),
+        "location": app_data.get("location", ""),
+        "date_applied": str(data.date_applied),
+        "application_email": app_data.get("application_email", ""),
+        "application_platform": app_data.get("application_platform", ""),
+        "employment_type": data.employment_type.value,
+        "salary_range": app_data.get("salary_range", ""),
+        "job_description": app_data.get("job_description", ""),
+        "job_url": job_url,
+        "status": data.status.value,
+        "notes": app_data.get("notes", ""),
+    }
 
     append_row(row)
 
