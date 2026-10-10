@@ -466,6 +466,7 @@ function detectPlatform(hostname) {
   if (hostname.includes("indeed.")) return "Indeed";
   if (hostname.includes("glints.")) return "Glints";
   if (hostname.includes("kalibrr.")) return "Kalibrr";
+  if (hostname.includes("deels.")) return "Deels";
   if (hostname.includes("glassdoor.")) return "Glassdoor";
   if (hostname.includes("monster.")) return "Monster";
   if (hostname.includes("dice.")) return "Dice";

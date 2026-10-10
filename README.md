@@ -60,9 +60,12 @@ curl http://localhost:8000/health
 3. Click "Load unpacked"
 4. Select the `extension/` folder
 
-### 3. Configure API Token
+### 3. Configure Extension
 
-Edit `extension/popup/popup.js` and replace `YOUR_API_TOKEN_HERE` with your actual API token.
+1. Click the extension icon in Chrome.
+2. Click **⚙️ Settings** (or it will automatically prompt on first run).
+3. Set your **API Base URL** (default: `http://localhost:8000`) and **API Token** matching your `backend/.env`.
+4. Click **Save Settings**.
 
 ## Usage
 

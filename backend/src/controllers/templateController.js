@@ -39,7 +39,7 @@ function validateTemplate(data, requireFields = false) {
 
 exports.create = (req, res) => {
   try {
-    const data = req.body;
+    const data = req.body || {};
 
     const validationError = validateTemplate(data, true);
     if (validationError) {
@@ -92,9 +92,10 @@ exports.update = (req, res) => {
     return res.status(404).json({ success: false, message: "Template not found." });
   }
 
+  const body = req.body || {};
   const data = {};
-  Object.keys(req.body).forEach((key) => {
-    if (req.body[key] !== undefined) data[key] = req.body[key];
+  Object.keys(body).forEach((key) => {
+    if (body[key] !== undefined) data[key] = body[key];
   });
 
   if (Object.keys(data).length === 0) {

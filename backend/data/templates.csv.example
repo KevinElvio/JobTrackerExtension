@@ -1,0 +1,2 @@
+template_id,name,description,content,dynamic_fields,created_at,updated_at
+tpl_example1,Backend Developer,, "Dear Hiring Manager, I am applying for {{posisi}} at {{company}}...",["posisi","company"],2026-09-10T00:00:00Z,2026-09-10T00:00:00Z

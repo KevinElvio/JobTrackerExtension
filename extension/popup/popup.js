@@ -1,10 +1,28 @@
-const API_BASE_URL = "http://localhost:8000";
-const API_TOKEN = "test_token_123";
+let API_BASE_URL = "http://localhost:8000";
+let API_TOKEN = "";
 
 let currentTab = null;
 let extractedData = null;
 let pendingSaveData = null;
 let autoSaveTimeout = null;
+
+function getLocalDate() {
+  const date = new Date();
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date - offset).toISOString().slice(0, 10);
+}
+
+function formatSalaryRange(value) {
+  const text = value.trim();
+  if (!/\bIDR\b|\bRp\.?/i.test(text)) return text;
+  const amounts = text.match(/\d[\d.,]*/g);
+  if (!amounts?.length) return text;
+  const formatted = amounts.slice(0, 2).map((amount) => {
+    const digits = amount.replace(/\D/g, "");
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  });
+  return `IDR ${formatted.join(" - ")}`;
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
   const urlParams = new URLSearchParams(window.location.search);
@@ -35,6 +53,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   currentTab = tabs[0];
 
+  // Load config first
+  const config = await new Promise(resolve => chrome.storage.local.get(["api_url", "api_token"], resolve));
+  if (config.api_url) API_BASE_URL = config.api_url;
+  if (config.api_token) API_TOKEN = config.api_token;
+
+  if (!API_TOKEN) {
+    loadingEl.style.display = "none";
+    document.getElementById("settings-panel").style.display = "block";
+    return;
+  }
+
   try {
     const response = await chrome.tabs.sendMessage(currentTab.id, {
       action: "extractJobData",
@@ -42,6 +71,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (response && response.success) {
       extractedData = response.data;
+      await loadEmails();
       await populateForm(extractedData);
       loadingEl.style.display = "none";
       formEl.style.display = "block";
@@ -55,7 +85,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     errorMessageEl.textContent = err.message || "Could not extract job information from this page.";
   }
 
-  await loadEmails();
   setupEventListeners();
   setupAutoSave();
 });
@@ -80,12 +109,11 @@ async function populateForm(data) {
     document.getElementById("job_role").value = data.role || "";
     document.getElementById("company_name").value = data.company || "";
     document.getElementById("location").value = data.location || "";
-    document.getElementById("salary_range").value = data.salary || "";
+    document.getElementById("salary_range").value = formatSalaryRange(data.salary || "");
     document.getElementById("job_description").value = data.description || "";
     document.getElementById("job_url").value = data.url || "";
 
-    const today = new Date().toISOString().split("T")[0];
-    document.getElementById("date_applied").value = today;
+    document.getElementById("date_applied").value = getLocalDate();
 
     if (data.platform) {
       const platformSelect = document.getElementById("application_platform");
@@ -120,8 +148,10 @@ async function loadEmails() {
     option.textContent = email;
     select.appendChild(option);
   });
-  if (currentVal) {
+  if (currentVal && emails.includes(currentVal)) {
     select.value = currentVal;
+  } else if (emails.length) {
+    select.value = emails[emails.length - 1];
   }
 }
 
@@ -141,6 +171,10 @@ function setupEventListeners() {
       document.getElementById("new-email-group").style.display = "none";
       document.getElementById("application_email").value = email;
     }
+  });
+
+  document.getElementById("salary_range").addEventListener("change", (event) => {
+    event.target.value = formatSalaryRange(event.target.value);
   });
 
   document.getElementById("cancel-btn").addEventListener("click", async () => {
@@ -165,6 +199,47 @@ function setupEventListeners() {
 
   document.getElementById("open-tab-btn").addEventListener("click", () => {
     openInTab();
+  });
+
+  document.getElementById("open-settings-btn").addEventListener("click", () => {
+    document.getElementById("job-form").style.display = "none";
+    document.getElementById("error").style.display = "none";
+    document.getElementById("duplicate-warning").style.display = "none";
+    
+    document.getElementById("setting_api_url").value = API_BASE_URL;
+    document.getElementById("setting_api_token").value = API_TOKEN;
+    document.getElementById("settings-panel").style.display = "block";
+  });
+
+  document.getElementById("cancel-settings-btn").addEventListener("click", () => {
+    if (!API_TOKEN) {
+      window.close();
+      return;
+    }
+    document.getElementById("settings-panel").style.display = "none";
+    document.getElementById("job-form").style.display = "block";
+  });
+
+  document.getElementById("save-settings-btn").addEventListener("click", async () => {
+    const newUrl = document.getElementById("setting_api_url").value.trim() || "http://localhost:8000";
+    const newToken = document.getElementById("setting_api_token").value.trim();
+    
+    if (!newToken) {
+      alert("API Token is required");
+      return;
+    }
+
+    await chrome.storage.local.set({
+      api_url: newUrl,
+      api_token: newToken
+    });
+
+    API_BASE_URL = newUrl;
+    API_TOKEN = newToken;
+
+    document.getElementById("settings-panel").style.display = "none";
+    // Reload extraction
+    location.reload();
   });
 }
 
@@ -239,7 +314,7 @@ async function saveApplication(forceSave) {
     application_email: formData.get("application_email"),
     application_platform: formData.get("application_platform"),
     employment_type: formData.get("employment_type"),
-    salary_range: formData.get("salary_range") || null,
+    salary_range: formatSalaryRange(formData.get("salary_range") || "") || null,
     job_description: formData.get("job_description"),
     job_url: formData.get("job_url"),
     status: "Applied",

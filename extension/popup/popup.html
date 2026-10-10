@@ -11,7 +11,8 @@
     <h1>Job Tracker</h1>
 
     <div id="open-tab-bar" style="display: none;">
-      <button type="button" id="open-tab-btn" class="btn-link">Open in Tab</button>
+      <button type="button" id="open-settings-btn" class="btn-link">⚙️ Settings</button>
+      <button type="button" id="open-tab-btn" class="btn-link" style="margin-left: 10px;">Open in Tab</button>
     </div>
 
     <div id="loading" class="loading">
@@ -66,6 +67,12 @@
           <option value="Company Website">Company Website</option>
           <option value="Glints">Glints</option>
           <option value="Kalibrr">Kalibrr</option>
+          <option value="Deels">Deels</option>
+          <option value="Glassdoor">Glassdoor</option>
+          <option value="Monster">Monster</option>
+          <option value="Dice">Dice</option>
+          <option value="RemoteOK">RemoteOK</option>
+          <option value="WeWorkRemotely">WeWorkRemotely</option>
           <option value="Other">Other</option>
         </select>
       </div>
@@ -118,6 +125,22 @@
       <div class="form-actions">
         <button type="button" id="cancel-duplicate-btn" class="btn btn-secondary">Cancel</button>
         <button type="button" id="force-save-btn" class="btn btn-primary">Save Anyway</button>
+      </div>
+    </div>
+
+    <div id="settings-panel" style="display: none;">
+      <h2>Settings</h2>
+      <div class="form-group">
+        <label for="setting_api_url">API Base URL</label>
+        <input type="url" id="setting_api_url" placeholder="http://localhost:8000">
+      </div>
+      <div class="form-group">
+        <label for="setting_api_token">API Token *</label>
+        <input type="password" id="setting_api_token" placeholder="Your API token">
+      </div>
+      <div class="form-actions">
+        <button type="button" id="cancel-settings-btn" class="btn btn-secondary">Cancel</button>
+        <button type="button" id="save-settings-btn" class="btn btn-primary">Save Settings</button>
       </div>
     </div>
 

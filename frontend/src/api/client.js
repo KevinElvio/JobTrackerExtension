@@ -9,9 +9,13 @@ function getHeaders() {
 
 async function request(path, options = {}) {
   try {
+    const headers = { ...getHeaders() };
+    if (options.body != null) {
+      headers["Content-Type"] = "application/json";
+    }
     const res = await fetch(`${API_BASE}${path}`, {
       ...options,
-      headers: { ...getHeaders(), ...options.headers },
+      headers: { ...headers, ...options.headers },
     });
     const data = await res.json();
     return res.ok ? data : { success: false, message: data.message || "Request failed." };

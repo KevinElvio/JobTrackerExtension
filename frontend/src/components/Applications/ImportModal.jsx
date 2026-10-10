@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, Fragment } from "react";
 import { api } from "../../api/client";
 
 const STEPS = { SELECT: "select", PREVIEW: "preview", RESULT: "result" };
@@ -13,6 +13,7 @@ export default function ImportModal({ onClose, onComplete }) {
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [rowPolicies, setRowPolicies] = useState({});
+  const [expandedErrors, setExpandedErrors] = useState(new Set());
   const fileInputRef = useRef(null);
 
   const acceptedTypes = ".csv,.xlsx,.xls";
@@ -87,6 +88,15 @@ export default function ImportModal({ onClose, onComplete }) {
   const getRowPolicy = (row) => {
     if (!row.isDuplicate) return null;
     return rowPolicies[row.index] || duplicatePolicy;
+  };
+
+  const toggleErrorExpand = (index) => {
+    setExpandedErrors((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
   };
 
   const handleDone = () => {
@@ -229,47 +239,76 @@ export default function ImportModal({ onClose, onComplete }) {
                 <tbody>
                   {rows.map((row) => {
                     const rowPolicy = getRowPolicy(row);
+                    const isExpanded = expandedErrors.has(row.index);
                     return (
-                      <tr
-                        key={row.index}
-                        className={
-                          !row.isValid ? "import-row-error" :
-                          row.isDuplicate && rowPolicy === "skip" ? "import-row-skip" :
-                          row.isDuplicate ? "import-row-dup" : ""
-                        }
-                      >
-                        <td>{row.index}</td>
-                        <td title={row.data.job_role}>{row.data.job_role || "-"}</td>
-                        <td title={row.data.company_name}>{row.data.company_name || "-"}</td>
-                        <td>{row.data.status || "Applied"}</td>
-                        <td title={row.data.job_url} className="import-url-cell">{row.data.job_url || "-"}</td>
-                        <td>
-                          {!row.isValid && (
-                            <span className="import-error-badge">{row.errors.length} error(s)</span>
-                          )}
-                          {row.isValid && !row.isDuplicate && (
-                            <span className="import-ok-badge">OK</span>
-                          )}
-                          {row.isDuplicate && row.isValid && (
-                            <span className="import-dup-badge">Duplicate</span>
-                          )}
-                        </td>
-                        {hasDuplicates && (
-                          <td onClick={(e) => e.stopPropagation()}>
-                            {row.isDuplicate && (
-                              <select
-                                className="input-sm import-row-select"
-                                value={rowPolicy}
-                                onChange={(e) => handleRowPolicyChange(row.index, e.target.value)}
+                      <Fragment key={row.index}>
+                        <tr
+                          className={
+                            !row.isValid ? "import-row-error" :
+                            row.isDuplicate && rowPolicy === "skip" ? "import-row-skip" :
+                            row.isDuplicate ? "import-row-dup" : ""
+                          }
+                        >
+                          <td>{row.index}</td>
+                          <td title={row.data.job_role}>{row.data.job_role || "-"}</td>
+                          <td title={row.data.company_name}>{row.data.company_name || "-"}</td>
+                          <td>{row.data.status || "Applied"}</td>
+                          <td title={row.data.job_url} className="import-url-cell">{row.data.job_url || "-"}</td>
+                          <td>
+                            {!row.isValid && (
+                              <button
+                                type="button"
+                                className={`import-error-badge ${isExpanded ? "expanded" : ""}`}
+                                onClick={(e) => { e.stopPropagation(); toggleErrorExpand(row.index); }}
                               >
-                                <option value="skip">Skip</option>
-                                <option value="overwrite">Overwrite</option>
-                                <option value="duplicate">Keep double</option>
-                              </select>
+                                {row.errors.length} error(s)
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: 4, transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.15s" }}>
+                                  <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                              </button>
+                            )}
+                            {row.isValid && !row.isDuplicate && (
+                              <span className="import-ok-badge">OK</span>
+                            )}
+                            {row.isDuplicate && row.isValid && (
+                              <span className="import-dup-badge">Duplicate</span>
                             )}
                           </td>
+                          {hasDuplicates && (
+                            <td onClick={(e) => e.stopPropagation()}>
+                              {row.isDuplicate && (
+                                <select
+                                  className="input-sm import-row-select"
+                                  value={rowPolicy}
+                                  onChange={(e) => handleRowPolicyChange(row.index, e.target.value)}
+                                >
+                                  <option value="skip">Skip</option>
+                                  <option value="overwrite">Overwrite</option>
+                                  <option value="duplicate">Keep double</option>
+                                </select>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                        {!row.isValid && isExpanded && (
+                          <tr className="import-error-expand-row">
+                            <td colSpan={hasDuplicates ? 7 : 6}>
+                              <div className="import-error-expand">
+                                {row.errors.map((errMsg, ei) => (
+                                  <div key={ei} className="import-error-msg">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" strokeWidth="2" style={{ flexShrink: 0, marginTop: 1 }}>
+                                      <circle cx="12" cy="12" r="10" />
+                                      <line x1="12" y1="8" x2="12" y2="12" />
+                                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                                    </svg>
+                                    <span>{errMsg}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
                         )}
-                      </tr>
+                      </Fragment>
                     );
                   })}
                 </tbody>
@@ -354,8 +393,12 @@ export default function ImportModal({ onClose, onComplete }) {
                   <h4>Error Details</h4>
                   {result.errors.map((err, i) => (
                     <div key={i} className="import-result-error-item">
-                      <span className="import-result-error-row">Row {err.row}:</span>
-                      <span>{err.errors.join("; ")}</span>
+                      <span className="import-result-error-row">Row {err.row}</span>
+                      <div className="import-result-error-msgs">
+                        {err.errors.map((msg, mi) => (
+                          <span key={mi} className="import-result-error-msg">{msg}</span>
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>

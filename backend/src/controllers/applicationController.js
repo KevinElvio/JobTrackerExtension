@@ -7,6 +7,18 @@ const { generateId } = require("../utils/helpers");
 const VALID_STATUSES = ["Applied", "Interview", "Rejected", "Offer", "Accepted", "Withdrawn"];
 const VALID_EMPLOYMENT_TYPES = ["Internship", "Full Time", "Part Time", "Contract", "Freelance"];
 
+function formatSalaryRange(value) {
+  const text = String(value || "").trim();
+  if (!/\bIDR\b|\bRp\.?/i.test(text)) return text;
+  const amounts = text.match(/\d[\d.,]*/g);
+  if (!amounts?.length) return text;
+  const formatted = amounts.slice(0, 2).map((amount) => {
+    const digits = amount.replace(/\D/g, "");
+    return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  });
+  return `IDR ${formatted.join(" - ")}`;
+}
+
 function validateApplication(data, requireFields = false) {
   if (requireFields && (!data.job_role?.trim() || !data.company_name?.trim())) {
     return "job_role and company_name are required.";
@@ -40,7 +52,7 @@ function checkDuplicate(url) {
 
 exports.create = (req, res) => {
   try {
-    const data = req.body;
+    const data = req.body || {};
 
     const validationError = validateApplication(data, true);
     if (validationError) {
@@ -70,7 +82,7 @@ exports.create = (req, res) => {
       application_email: sanitized.application_email || "",
       application_platform: sanitized.application_platform || "",
       employment_type: VALID_EMPLOYMENT_TYPES.includes(data.employment_type) ? data.employment_type : "Full Time",
-      salary_range: sanitized.salary_range || "",
+      salary_range: formatSalaryRange(sanitized.salary_range),
       job_description: sanitized.job_description || "",
       job_url: sanitized.job_url || "",
       status: VALID_STATUSES.includes(data.status) ? data.status : "Applied",
@@ -108,9 +120,10 @@ exports.update = (req, res) => {
     return res.status(404).json({ success: false, message: "Application not found." });
   }
 
+  const body = req.body || {};
   const data = {};
-  Object.keys(req.body).forEach((key) => {
-    if (req.body[key] !== undefined) data[key] = req.body[key];
+  Object.keys(body).forEach((key) => {
+    if (body[key] !== undefined) data[key] = body[key];
   });
 
     if (Object.keys(data).length === 0) {
@@ -123,7 +136,10 @@ exports.update = (req, res) => {
     }
 
     const sanitized = sanitizeApplication(data);
-  const ok = csvService.update(req.params.id, sanitized);
+    if (sanitized.salary_range !== undefined) {
+      sanitized.salary_range = formatSalaryRange(sanitized.salary_range);
+    }
+    const ok = csvService.update(req.params.id, sanitized);
 
   if (!ok) {
     return res.status(500).json({ success: false, message: "Failed to update." });

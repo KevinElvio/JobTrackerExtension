@@ -37,4 +37,10 @@ Thumbs.db
 node_modules/
 frontend/dist/
 
+# Data & uploads (user-generated)
+backend/data/*.csv
+backend/data/*.xlsx
+backend/uploads/
+
+# OpenCode / Antigravity
 .opencode

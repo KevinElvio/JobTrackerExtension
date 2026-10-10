@@ -1,0 +1,2 @@
+application_id,job_role,company_name,location,date_applied,application_email,application_platform,employment_type,salary_range,job_description,job_url,status,notes
+job_example1,Software Engineer,Tech Corp,"Jakarta, Indonesia",2026-09-10,user@example.com,LinkedIn,Full Time,"IDR 10.000.000 - 15.000.000","Example job description",https://linkedin.com/jobs/example,Applied,"Example notes"
