@@ -28,7 +28,7 @@ FROM node:20-alpine
 
 # Informasi Metadata Image (Nama & Versi)
 LABEL name="Job-Tracker"
-LABEL version="1.0.5"
+LABEL version="1.1.0"
 LABEL description="Fullstack Application with React and Express"
 
 WORKDIR /app

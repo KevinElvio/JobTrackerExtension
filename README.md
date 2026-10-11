@@ -36,7 +36,6 @@ Edit `backend/.env`:
 
 ```
 CSV_FILE_PATH=./data/applications.csv
-API_TOKEN=your_random_api_token
 ```
 
 Start the backend:
@@ -45,7 +44,7 @@ Start the backend:
 docker compose up -d
 ```
 
-The API will be available at `http://localhost:8000`.
+The API will be available at `http://localhost:8000` (bound to localhost only).
 
 Test with:
 
@@ -60,12 +59,11 @@ curl http://localhost:8000/health
 3. Click "Load unpacked"
 4. Select the `extension/` folder
 
-### 3. Configure Extension
+### 3. Backend Connection
 
-1. Click the extension icon in Chrome.
-2. Click **⚙️ Settings** (or it will automatically prompt on first run).
-3. Set your **API Base URL** (default: `http://localhost:8000`) and **API Token** matching your `backend/.env`.
-4. Click **Save Settings**.
+No configuration needed. The extension probes `http://localhost:8000/health` on open and caches the working URL.
+
+If your backend runs on another address, click **⚙️ Settings** in the popup and enter the backend URL.
 
 ## Usage
 
@@ -84,9 +82,10 @@ Create a new job application.
 
 **Headers:**
 ```
-Authorization: Bearer <API_TOKEN>
 Content-Type: application/json
 ```
+
+No authentication required. The API is bound to `127.0.0.1` and only reachable from your own machine.
 
 **Request Body:**
 ```json

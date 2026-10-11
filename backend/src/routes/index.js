@@ -2,7 +2,6 @@ const { Router } = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
-const { authenticate } = require("../middleware/auth");
 const ctrl = require("../controllers/applicationController");
 
 const router = Router();
@@ -35,14 +34,14 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-router.post("/applications", authenticate, ctrl.create);
-router.get("/applications", authenticate, ctrl.list);
-router.get("/applications/template", authenticate, ctrl.template);
-router.post("/applications/preview", authenticate, upload.single("file"), ctrl.preview);
-router.post("/applications/import", authenticate, upload.single("file"), ctrl.import);
-router.get("/applications/:id", authenticate, ctrl.getById);
-router.put("/applications/:id", authenticate, ctrl.update);
-router.delete("/applications/:id", authenticate, ctrl.remove);
-router.get("/statistics", authenticate, ctrl.statistics);
+router.post("/applications", ctrl.create);
+router.get("/applications", ctrl.list);
+router.get("/applications/template", ctrl.template);
+router.post("/applications/preview", upload.single("file"), ctrl.preview);
+router.post("/applications/import", upload.single("file"), ctrl.import);
+router.get("/applications/:id", ctrl.getById);
+router.put("/applications/:id", ctrl.update);
+router.delete("/applications/:id", ctrl.remove);
+router.get("/statistics", ctrl.statistics);
 
 module.exports = router;

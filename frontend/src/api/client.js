@@ -1,15 +1,8 @@
 const API_BASE = "/api";
 
-function getHeaders() {
-  const token = localStorage.getItem("api_token") || "";
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-}
-
 async function request(path, options = {}) {
   try {
-    const headers = { ...getHeaders() };
+    const headers = {};
     if (options.body != null) {
       headers["Content-Type"] = "application/json";
     }
@@ -26,10 +19,8 @@ async function request(path, options = {}) {
 
 async function uploadRequest(path, formData) {
   try {
-    const token = localStorage.getItem("api_token") || "";
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
       body: formData,
     });
     const data = await res.json();
@@ -40,19 +31,6 @@ async function uploadRequest(path, formData) {
 }
 
 export const api = {
-  login: (token) => {
-    localStorage.setItem("api_token", token);
-    return request("/applications");
-  },
-
-  logout: () => {
-    localStorage.removeItem("api_token");
-  },
-
-  isAuthenticated: () => {
-    return !!localStorage.getItem("api_token");
-  },
-
   getApplications: () => request("/applications"),
 
   getApplication: (id) => request(`/applications/${id}`),
@@ -114,10 +92,7 @@ export const api = {
 
   downloadTemplate: async () => {
     try {
-      const token = localStorage.getItem("api_token") || "";
-      const res = await fetch(`${API_BASE}/applications/template`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`${API_BASE}/applications/template`);
       if (!res.ok) return { success: false, message: "Failed to download template." };
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

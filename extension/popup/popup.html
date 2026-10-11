@@ -131,13 +131,12 @@
     <div id="settings-panel" style="display: none;">
       <h2>Settings</h2>
       <div class="form-group">
-        <label for="setting_api_url">API Base URL</label>
+        <label for="setting_api_url">Backend URL</label>
         <input type="url" id="setting_api_url" placeholder="http://localhost:8000">
       </div>
-      <div class="form-group">
-        <label for="setting_api_token">API Token *</label>
-        <input type="password" id="setting_api_token" placeholder="Your API token">
-      </div>
+      <p id="settings-warning" class="error-text" style="display: none;">
+        Backend not reachable at this URL. Make sure Docker is running, then try again.
+      </p>
       <div class="form-actions">
         <button type="button" id="cancel-settings-btn" class="btn btn-secondary">Cancel</button>
         <button type="button" id="save-settings-btn" class="btn btn-primary">Save Settings</button>

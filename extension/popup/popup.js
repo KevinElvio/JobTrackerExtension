@@ -1,5 +1,6 @@
-let API_BASE_URL = "http://localhost:8000";
-let API_TOKEN = "";
+const DEFAULT_API_URL = "http://localhost:8000";
+
+let API_BASE_URL = DEFAULT_API_URL;
 
 let currentTab = null;
 let extractedData = null;
@@ -24,6 +25,65 @@ function formatSalaryRange(value) {
   return `IDR ${formatted.join(" - ")}`;
 }
 
+async function probeApi(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1200);
+  try {
+    const res = await fetch(`${url}/health`, { signal: controller.signal });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return data?.status === "ok";
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function resolveApiBaseUrl() {
+  const stored = await new Promise((resolve) =>
+    chrome.storage.local.get(["api_url"], (result) => resolve(result.api_url || null))
+  );
+
+  const candidates = stored ? [stored, DEFAULT_API_URL] : [DEFAULT_API_URL];
+  for (const candidate of candidates) {
+    if (await probeApi(candidate)) {
+      API_BASE_URL = candidate;
+      if (candidate !== stored) {
+        await chrome.storage.local.set({ api_url: candidate });
+      }
+      return candidate;
+    }
+  }
+
+  API_BASE_URL = stored || DEFAULT_API_URL;
+  return null;
+}
+
+async function recoverApiUrl() {
+  await chrome.storage.local.remove(["api_url"]);
+  return resolveApiBaseUrl();
+}
+
+async function postApplication(data) {
+  const send = () =>
+    fetch(`${API_BASE_URL}/api/applications`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+  try {
+    return await send();
+  } catch (err) {
+    const recovered = await recoverApiUrl();
+    if (!recovered) throw err;
+    return send();
+  }
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const isTab = urlParams.get("tab") === "1";
@@ -32,8 +92,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const formEl = document.getElementById("job-form");
   const errorEl = document.getElementById("error");
   const errorMessageEl = document.getElementById("error-message");
+  const apiResolved = await resolveApiBaseUrl();
 
   if (isTab) {
+    if (!apiResolved) {
+      loadingEl.style.display = "none";
+      errorEl.style.display = "block";
+      errorMessageEl.textContent = "Job Tracker backend not found. Reopen the extension popup to set the backend URL.";
+      return;
+    }
     const saved = await getSavedFormData();
     if (saved) {
       await loadEmails();
@@ -53,13 +120,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   currentTab = tabs[0];
 
-  // Load config first
-  const config = await new Promise(resolve => chrome.storage.local.get(["api_url", "api_token"], resolve));
-  if (config.api_url) API_BASE_URL = config.api_url;
-  if (config.api_token) API_TOKEN = config.api_token;
-
-  if (!API_TOKEN) {
+  if (!apiResolved) {
     loadingEl.style.display = "none";
+    document.getElementById("settings-warning").style.display = "block";
     document.getElementById("settings-panel").style.display = "block";
     return;
   }
@@ -205,40 +268,37 @@ function setupEventListeners() {
     document.getElementById("job-form").style.display = "none";
     document.getElementById("error").style.display = "none";
     document.getElementById("duplicate-warning").style.display = "none";
-    
+
     document.getElementById("setting_api_url").value = API_BASE_URL;
-    document.getElementById("setting_api_token").value = API_TOKEN;
+    document.getElementById("settings-warning").style.display = "none";
     document.getElementById("settings-panel").style.display = "block";
   });
 
-  document.getElementById("cancel-settings-btn").addEventListener("click", () => {
-    if (!API_TOKEN) {
-      window.close();
-      return;
-    }
+  document.getElementById("cancel-settings-btn").addEventListener("click", async () => {
     document.getElementById("settings-panel").style.display = "none";
-    document.getElementById("job-form").style.display = "block";
+    const connected = await resolveApiBaseUrl();
+    if (connected) {
+      document.getElementById("job-form").style.display = "block";
+    } else {
+      document.getElementById("error").style.display = "block";
+      document.getElementById("error-message").textContent =
+        "Job Tracker backend not found. Make sure Docker is running, then reopen the extension.";
+    }
   });
 
   document.getElementById("save-settings-btn").addEventListener("click", async () => {
-    const newUrl = document.getElementById("setting_api_url").value.trim() || "http://localhost:8000";
-    const newToken = document.getElementById("setting_api_token").value.trim();
-    
-    if (!newToken) {
-      alert("API Token is required");
+    const newUrl = document.getElementById("setting_api_url").value.trim() || DEFAULT_API_URL;
+    document.getElementById("settings-warning").style.display = "none";
+
+    if (!(await probeApi(newUrl))) {
+      document.getElementById("settings-warning").style.display = "block";
       return;
     }
 
-    await chrome.storage.local.set({
-      api_url: newUrl,
-      api_token: newToken
-    });
-
+    await chrome.storage.local.set({ api_url: newUrl });
     API_BASE_URL = newUrl;
-    API_TOKEN = newToken;
 
     document.getElementById("settings-panel").style.display = "none";
-    // Reload extraction
     location.reload();
   });
 }
@@ -333,20 +393,8 @@ async function saveApplication(forceSave) {
   saveBtn.textContent = "Saving...";
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/applications`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${API_TOKEN}`,
-      },
-      body: JSON.stringify(data),
-    });
-
+    const response = await postApplication(data);
     const result = await response.json();
-
-    if (response.status === 401) {
-      throw new Error("Authentication failed. Please check your API token.");
-    }
 
     if (!response.ok) {
       throw new Error(result.detail || "Failed to save application.");

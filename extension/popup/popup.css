@@ -152,6 +152,12 @@ textarea {
   color: #c33;
 }
 
+.error-text {
+  color: #c33;
+  font-size: 12px;
+  margin: 0 0 12px;
+}
+
 #success {
   background: #efe;
   border: 1px solid #cfc;
