@@ -28,10 +28,17 @@ docker-compose.override.yml
 .DS_Store
 Thumbs.db
 
-# Google Service Account
-*.json
+# Google Service Account credentials (SECRETS — never commit)
+service-account*.json
+serviceAccount*.json
+*-service-account.json
+*-service-account-*.json
+gcp-*.json
+
+# ...but these JSON files are safe and MUST be tracked
 !package.json
 !package-lock.json
+!extension/manifest.json
 
 # Node
 node_modules/
