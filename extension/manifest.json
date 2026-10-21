@@ -34,6 +34,11 @@
       "matches": ["<all_urls>"],
       "js": ["scripts/content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["scripts/ai-autofill.js"],
+      "run_at": "document_idle"
     }
   ]
 }

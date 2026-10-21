@@ -264,6 +264,31 @@ function setupEventListeners() {
     openInTab();
   });
 
+  const autofillBtn = document.getElementById("autofill-btn");
+  if (autofillBtn) {
+    autofillBtn.addEventListener("click", async () => {
+      autofillBtn.disabled = true;
+      autofillBtn.textContent = "Filling...";
+      try {
+        const response = await chrome.runtime.sendMessage({
+          action: "autofill",
+          tabId: currentTab.id,
+          apiUrl: API_BASE_URL,
+        });
+        if (response && response.success) {
+          alert(`Filled ${response.filled} fields.`);
+        } else {
+          alert(`Autofill failed: ${response?.error || "Unknown error"}`);
+        }
+      } catch (err) {
+        alert(`Autofill error: ${err.message}`);
+      } finally {
+        autofillBtn.disabled = false;
+        autofillBtn.textContent = "✨ Autofill";
+      }
+    });
+  }
+
   document.getElementById("open-settings-btn").addEventListener("click", () => {
     document.getElementById("job-form").style.display = "none";
     document.getElementById("error").style.display = "none";
