@@ -2,25 +2,27 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "../../api/client";
 
 const DIRECT_FIELDS = [
-  { key: "full_name", label: "Full Name", type: "text" },
-  { key: "email", label: "Email", type: "email" },
-  { key: "phone", label: "Phone", type: "text" },
-  { key: "city", label: "City", type: "text" },
-  { key: "linkedin", label: "LinkedIn URL", type: "text" },
-  { key: "salary_expectation", label: "Salary Expectation", type: "text" },
-  { key: "notice_period", label: "Notice Period", type: "text" },
+  { key: "full_name", label: "Full Name", type: "text", icon: "👤" },
+  { key: "email", label: "Email", type: "email", icon: "✉️" },
+  { key: "phone", label: "Phone", type: "text", icon: "📱" },
+  { key: "city", label: "City", type: "text", icon: "📍" },
+  { key: "linkedin", label: "LinkedIn URL", type: "text", icon: "🔗" },
+  { key: "salary_expectation", label: "Salary Expectation", type: "text", icon: "💰" },
+  { key: "notice_period", label: "Notice Period", type: "text", icon: "⏱️" },
 ];
 
 const CONTEXT_FIELDS = [
-  { key: "about_me", label: "About Me", rows: 3 },
-  { key: "proudest_achievement", label: "Proudest Achievement", rows: 2 },
-  { key: "career_goal", label: "Career Goal", rows: 2 },
-  { key: "availability", label: "Availability", rows: 2 },
+  { key: "about_me", label: "About Me", rows: 4, placeholder: "Write a short summary about yourself..." },
+  { key: "proudest_achievement", label: "Proudest Achievement", rows: 3, placeholder: "Your most notable accomplishment..." },
+  { key: "career_goal", label: "Career Goal", rows: 3, placeholder: "Where do you want to be in 3-5 years..." },
+  { key: "availability", label: "Availability", rows: 2, placeholder: "When can you start, work preferences..." },
 ];
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [contextMd, setContextMd] = useState("");
+  const [skillsText, setSkillsText] = useState("");
+  const [languagesText, setLanguagesText] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -33,7 +35,12 @@ export default function Profile() {
       api.getProfile(),
       api.getProfileContext(),
     ]);
-    if (profRes.success) setProfile(profRes.data);
+    if (profRes.success) {
+      setProfile(profRes.data);
+      const df = profRes.data?.direct_fill || {};
+      setSkillsText((df.skills || []).join(", "));
+      setLanguagesText((df.languages || []).join(", "));
+    }
     if (ctxRes.success) setContextMd(ctxRes.data.content || "");
     setLoading(false);
   }, []);
@@ -54,58 +61,39 @@ export default function Profile() {
     }));
   };
 
-  const updateSkills = (value) => {
-    const skills = value.split(",").map((s) => s.trim()).filter(Boolean);
+  const syncSkillsToProfile = () => {
+    const skills = skillsText.split(",").map((s) => s.trim()).filter(Boolean);
     setProfile((prev) => ({
       ...prev,
       direct_fill: { ...prev.direct_fill, skills },
     }));
   };
 
-  const updateLanguages = (value) => {
-    const languages = value.split(",").map((s) => s.trim()).filter(Boolean);
+  const syncLanguagesToProfile = () => {
+    const languages = languagesText.split(",").map((s) => s.trim()).filter(Boolean);
     setProfile((prev) => ({
       ...prev,
       direct_fill: { ...prev.direct_fill, languages },
     }));
   };
 
-  const handleSaveProfile = async () => {
-    setSaving(true);
-    setError("");
-    setMessage("");
-    const res = await api.updateProfile(profile);
-    if (res.success) {
-      setMessage("Profile saved.");
-    } else {
-      setError(res.message || "Failed to save profile.");
-    }
-    setSaving(false);
-  };
-
-  const handleSaveContext = async () => {
-    setSaving(true);
-    setError("");
-    setMessage("");
-    const res = await api.updateProfileContext(contextMd);
-    if (res.success) {
-      setMessage("Context saved.");
-    } else {
-      setError(res.message || "Failed to save context.");
-    }
-    setSaving(false);
-  };
-
   const handleSaveAll = async () => {
     setSaving(true);
     setError("");
     setMessage("");
+    const skills = skillsText.split(",").map((s) => s.trim()).filter(Boolean);
+    const languages = languagesText.split(",").map((s) => s.trim()).filter(Boolean);
+    const updatedProfile = {
+      ...profile,
+      direct_fill: { ...profile.direct_fill, skills, languages },
+    };
+    setProfile(updatedProfile);
     const [r1, r2] = await Promise.all([
-      api.updateProfile(profile),
+      api.updateProfile(updatedProfile),
       api.updateProfileContext(contextMd),
     ]);
     if (r1.success && r2.success) {
-      setMessage("Profile & context saved.");
+      setMessage("Profile & context saved successfully.");
     } else {
       setError(r1.message || r2.message || "Failed to save.");
     }
@@ -122,6 +110,9 @@ export default function Profile() {
     if (res.success) {
       const data = res.data;
       setProfile(data.profile);
+      const df = data.profile?.direct_fill || {};
+      setSkillsText((df.skills || []).join(", "));
+      setLanguagesText((df.languages || []).join(", "));
       if (data.context_draft) {
         setContextMd(data.context_draft);
       }
@@ -133,101 +124,147 @@ export default function Profile() {
     e.target.value = "";
   };
 
-  if (loading) return <div className="loading">Loading profile...</div>;
-  if (!profile) return <div className="error">Failed to load profile.</div>;
+  if (loading) return <div className="profile-loading">Loading profile...</div>;
+  if (!profile) return <div className="profile-error">Failed to load profile.</div>;
 
   const df = profile.direct_fill || {};
   const pc = profile.personal_context || {};
 
   return (
     <div className="profile-page">
-      <h2>Profile</h2>
-      <p className="profile-hint">
-        Upload your CV once. AI extracts your data. Review and edit, then save.
-        This profile is used by the extension to autofill job application forms.
-      </p>
-
-      <div className="profile-section">
-        <h3>Upload CV</h3>
-        <input
-          type="file"
-          accept=".pdf,.txt"
-          onChange={handleCvUpload}
-          disabled={analyzing}
-        />
-        {analyzing && <span className="profile-status">Analyzing CV with AI...</span>}
-      </div>
-
-      <div className="profile-section">
-        <h3>Direct Fill (deterministic)</h3>
-        <p className="profile-hint">These fields are filled instantly without AI.</p>
-        {DIRECT_FIELDS.map((f) => (
-          <div className="form-group" key={f.key}>
-            <label>{f.label}</label>
+      {/* Header */}
+      <div className="profile-header">
+        <div>
+          <h1>My Profile</h1>
+          <p className="profile-subtitle">
+            Upload your CV once. AI extracts your data. Review, edit, and save.
+            This profile powers the extension's autofill.
+          </p>
+        </div>
+        <div className="profile-header-actions">
+          <label className="btn btn-primary profile-upload-btn">
+            {analyzing ? "Analyzing..." : "📄 Upload CV"}
             <input
-              type={f.type}
-              value={df[f.key] || ""}
-              onChange={(e) => updateDirect(f.key, e.target.value)}
+              type="file"
+              accept=".pdf,.txt"
+              onChange={handleCvUpload}
+              disabled={analyzing}
+              hidden
             />
-          </div>
-        ))}
-        <div className="form-group">
-          <label>Skills (comma separated)</label>
-          <input
-            type="text"
-            value={(df.skills || []).join(", ")}
-            onChange={(e) => updateSkills(e.target.value)}
-            placeholder="Node.js, Express, PostgreSQL, ..."
-          />
-        </div>
-        <div className="form-group">
-          <label>Languages (comma separated)</label>
-          <input
-            type="text"
-            value={(df.languages || []).join(", ")}
-            onChange={(e) => updateLanguages(e.target.value)}
-            placeholder="English, Indonesian, ..."
-          />
+          </label>
         </div>
       </div>
 
-      <div className="profile-section">
-        <h3>Personal Context (AI-assisted)</h3>
-        <p className="profile-hint">AI drafts these from your CV. Edit as needed.</p>
-        {CONTEXT_FIELDS.map((f) => (
-          <div className="form-group" key={f.key}>
-            <label>{f.label}</label>
-            <textarea
-              rows={f.rows}
-              value={pc[f.key] || ""}
-              onChange={(e) => updateContext(f.key, e.target.value)}
-            />
+      {message && <div className="profile-banner profile-banner-success">{message}</div>}
+      {error && <div className="profile-banner profile-banner-error">{error}</div>}
+
+      <div className="profile-grid">
+        {/* Left column: Direct Fill */}
+        <div className="profile-card">
+          <div className="profile-card-header">
+            <span className="profile-card-icon">⚡</span>
+            <div>
+              <h3>Direct Fill</h3>
+              <p>Deterministic — filled instantly, no AI</p>
+            </div>
           </div>
-        ))}
+          <div className="profile-card-body">
+            {DIRECT_FIELDS.map((f) => (
+              <div className="profile-field" key={f.key}>
+                <label>
+                  <span className="profile-field-icon">{f.icon}</span>
+                  {f.label}
+                </label>
+                <input
+                  type={f.type}
+                  value={df[f.key] || ""}
+                  onChange={(e) => updateDirect(f.key, e.target.value)}
+                  placeholder={f.label}
+                />
+              </div>
+            ))}
+            <div className="profile-field">
+              <label>
+                <span className="profile-field-icon">🛠️</span>
+                Skills
+              </label>
+              <input
+                type="text"
+                value={skillsText}
+                onChange={(e) => setSkillsText(e.target.value)}
+                onBlur={syncSkillsToProfile}
+                placeholder="Node.js, Express, PostgreSQL, ..."
+              />
+              <span className="profile-field-hint">Comma separated</span>
+            </div>
+            <div className="profile-field">
+              <label>
+                <span className="profile-field-icon">🌐</span>
+                Languages
+              </label>
+              <input
+                type="text"
+                value={languagesText}
+                onChange={(e) => setLanguagesText(e.target.value)}
+                onBlur={syncLanguagesToProfile}
+                placeholder="English, Indonesian, ..."
+              />
+              <span className="profile-field-hint">Comma separated</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right column: Personal Context */}
+        <div className="profile-card">
+          <div className="profile-card-header">
+            <span className="profile-card-icon">🧠</span>
+            <div>
+              <h3>Personal Context</h3>
+              <p>AI-assisted — drafts from your CV, edit freely</p>
+            </div>
+          </div>
+          <div className="profile-card-body">
+            {CONTEXT_FIELDS.map((f) => (
+              <div className="profile-field" key={f.key}>
+                <label>{f.label}</label>
+                <textarea
+                  rows={f.rows}
+                  value={pc[f.key] || ""}
+                  onChange={(e) => updateContext(f.key, e.target.value)}
+                  placeholder={f.placeholder}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <div className="profile-section">
-        <h3>Context (Markdown)</h3>
-        <p className="profile-hint">
-          This is the full narrative context used by AI when filling essay fields.
-          Edit freely.
-        </p>
-        <textarea
-          rows={12}
-          value={contextMd}
-          onChange={(e) => setContextMd(e.target.value)}
-          style={{ width: "100%", fontFamily: "monospace" }}
-        />
+      {/* Context Markdown */}
+      <div className="profile-card profile-card-full">
+        <div className="profile-card-header">
+          <span className="profile-card-icon">📝</span>
+          <div>
+            <h3>Context (Markdown)</h3>
+            <p>Full narrative used by AI when filling essay fields. Edit freely.</p>
+          </div>
+        </div>
+        <div className="profile-card-body">
+          <textarea
+            className="profile-context-editor"
+            rows={14}
+            value={contextMd}
+            onChange={(e) => setContextMd(e.target.value)}
+            placeholder="# About Me\n\nWrite your personal narrative here..."
+          />
+        </div>
       </div>
 
-      {message && <p className="profile-success">{message}</p>}
-      {error && <p className="profile-error">{error}</p>}
-
-      <div className="form-actions">
-        <button className="btn btn-primary" onClick={handleSaveAll} disabled={saving}>
-          {saving ? "Saving..." : "Save All"}
+      <div className="profile-save-bar">
+        <button className="btn btn-primary profile-save-btn" onClick={handleSaveAll} disabled={saving}>
+          {saving ? "Saving..." : "💾 Save All"}
         </button>
       </div>
     </div>
   );
 }
+EOF
