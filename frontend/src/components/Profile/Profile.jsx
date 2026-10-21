@@ -231,4 +231,3 @@ export default function Profile() {
     </div>
   );
 }
-EOF
