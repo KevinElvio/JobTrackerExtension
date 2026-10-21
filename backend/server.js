@@ -4,6 +4,7 @@ const path = require("path");
 const config = require("./src/config");
 const routes = require("./src/routes");
 const templateRoutes = require("./src/routes/templateRoutes");
+const profileRoutes = require("./src/routes/profileRoutes");
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use("/api", routes);
 app.use("/api", templateRoutes);
+app.use("/api", profileRoutes);
 
 app.use((err, _req, res, next) => {
   if (err instanceof (require("multer").MulterError)) {
