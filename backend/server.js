@@ -7,7 +7,17 @@ const templateRoutes = require("./src/routes/templateRoutes");
 
 const app = express();
 
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      /^chrome-extension:\/\//,
+      /^moz-extension:\/\//,
+      "http://localhost:3000",
+      "http://localhost:8000",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  })
+);
 app.use(express.json({ limit: "10mb" }));
 app.use("/api", routes);
 app.use("/api", templateRoutes);

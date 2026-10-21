@@ -50,6 +50,7 @@ backend/public/
 # Data & uploads (user-generated)
 backend/data/*.csv
 backend/data/*.xlsx
+backend/data/*.json
 backend/uploads/
 
 # OpenCode / Antigravity
