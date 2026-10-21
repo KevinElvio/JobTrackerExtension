@@ -3,11 +3,16 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "127.0.0.1:8000:8000"
+    # network_mode: host → container pakai network stack host,
+    # sehingga localhost:11434 (Ollama) bisa dijangkau tanpa bind 0.0.0.0
+    network_mode: host
     environment:
       CSV_FILE_PATH: /app/data/applications.csv
       CSV_TEMPLATES_PATH: /app/data/templates.csv
+      PROFILE_FILE_PATH: /app/data/profile.json
+      CONTEXT_FILE_PATH: /app/data/context.md
+      OLLAMA_URL: "http://127.0.0.1:11434"
+      PORT: "8000"
     volumes:
       - ./backend/data:/app/data
       - ./backend/uploads:/app/uploads

@@ -90,6 +90,22 @@ export const api = {
     return uploadRequest("/applications/import", formData);
   },
 
+  getProfile: () => request("/profile"),
+
+  updateProfile: (data) =>
+    request("/profile", { method: "PUT", body: JSON.stringify(data) }),
+
+  getProfileContext: () => request("/profile/context"),
+
+  updateProfileContext: (content) =>
+    request("/profile/context", { method: "PUT", body: JSON.stringify({ content }) }),
+
+  analyzeCv: (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return uploadRequest("/profile/analyze-cv", formData);
+  },
+
   downloadTemplate: async () => {
     try {
       const res = await fetch(`${API_BASE}/applications/template`);

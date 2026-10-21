@@ -5,6 +5,7 @@ import Dashboard from "./components/Dashboard/Dashboard";
 import Applications from "./components/Applications/Applications";
 import Statistics from "./components/Statistics/Statistics";
 import Templates from "./components/Templates/Templates";
+import Profile from "./components/Profile/Profile";
 
 function AppContent() {
   const [page, setPage] = useState("dashboard");
@@ -14,6 +15,7 @@ function AppContent() {
       case "applications": return <Applications />;
       case "statistics": return <Statistics />;
       case "templates": return <Templates />;
+      case "profile": return <Profile />;
       default: return <Dashboard />;
     }
   };
