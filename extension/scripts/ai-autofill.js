@@ -89,7 +89,9 @@ function mapIntent(label) {
     { intent: "portfolio", p: [/portfolio/i, /portofolio/i] },
     { intent: "github", p: [/github/i] },
     { intent: "website", p: [/website/i, /personal\s*site/i, /blog/i] },
-    { intent: "salary_expectation", p: [/expected\s*salary/i, /salary\s*expectation/i, /gaji/i, /besaran\s*gaji/i, /desired\s*salary/i] },
+    { intent: "current_company", p: [/current\s*company/i, /perusahaan\s*saat/i, /employer/i] },
+  { intent: "current_title", p: [/current\s*title/i, /posisi\s*saat/i, /jabatan\s*saat/i, /current\s*role/i] },
+  { intent: "salary_expectation", p: [/expected\s*salary/i, /salary\s*expectation/i, /gaji/i, /besaran\s*gaji/i, /desired\s*salary/i] },
     { intent: "notice_period", p: [/notice\s*period/i, /masa\s*pemberitahuan/i, /kapan\s*bisa\s*mulai/i, /availability/i, /kapan\s*mulai/i, /earliest\s*start/i] },
     { intent: "education_level", p: [/education\s*level/i, /tingkat\s*pendidikan/i, /pendidikan\s*terakhir/i, /highest\s*education/i] },
     { intent: "major", p: [/major/i, /jurusan/i, /field\s*of\s*study/i] },
@@ -122,15 +124,11 @@ function isEssayField(el, intent) {
 function generateSelector(el, idx) {
   if (el.id) return `#${CSS.escape(el.id)}`;
   if (el.name) return `[name="${CSS.escape(el.name)}"]`;
-  // Fallback: nth-of-type
-  const tag = el.tagName.toLowerCase();
-  const parent = el.parentElement;
-  if (parent) {
-    const siblings = Array.from(parent.querySelectorAll(tag));
-    const i = siblings.indexOf(el) + 1;
-    return `${tag}:nth-of-type(${i})`;
-  }
-  return `${tag}[data-idx="${idx}"]`;
+  // Robust fallback: stamp a unique attribute so the element can be
+  // re-located deterministically even without id/name.
+  const attr = "data-jt-field";
+  el.setAttribute(attr, String(idx));
+  return `[${attr}="${idx}"]`;
 }
 
 // --- Execute fill instructions ---

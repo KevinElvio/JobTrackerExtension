@@ -46,7 +46,7 @@ function extractLabel(el) {
 
   // 2. <label for="id">
   if (el.id) {
-    const label = document.querySelector(`label[for="${el.id}"]`);
+    const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
     if (label) return label.textContent.trim();
   }
 
