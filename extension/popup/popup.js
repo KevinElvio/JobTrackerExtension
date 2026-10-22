@@ -276,7 +276,11 @@ function setupEventListeners() {
           apiUrl: API_BASE_URL,
         });
         if (response && response.success) {
-          alert(`Filled ${response.filled} fields.`);
+          if (!response.filled) {
+            alert("Autofill ran, but 0 fields were filled. Make sure your profile is saved, the page is refreshed, and the form is not inside an unsupported widget.");
+          } else {
+            alert(`Filled ${response.filled} field(s).`);
+          }
         } else {
           alert(`Autofill failed: ${response?.error || "Unknown error"}`);
         }
