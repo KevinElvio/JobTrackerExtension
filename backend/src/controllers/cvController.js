@@ -4,7 +4,7 @@ const multer = require("multer");
 const { PDFParse } = require("pdf-parse");
 
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
-const MODEL = process.env.OLLAMA_MODEL || "qwen2.5:0.5b";
+const MODEL = process.env.OLLAMA_MODEL || "qwen2.5-coder:3b";
 
 const uploadDir = path.join(__dirname, "../../uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });

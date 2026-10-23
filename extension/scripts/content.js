@@ -6,6 +6,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } catch (err) {
       sendResponse({ success: false, error: err.message });
     }
+    return true;
+  }
+
+  if (request.action === "getPageText") {
+    try {
+      const text = (document.body && document.body.innerText) ? document.body.innerText : "";
+      sendResponse({
+        success: true,
+        data: {
+          text: text.slice(0, 8000),
+          url: window.location.href,
+          title: document.title || "",
+        },
+      });
+    } catch (err) {
+      sendResponse({ success: false, error: err.message });
+    }
+    return true;
   }
   return true;
 });

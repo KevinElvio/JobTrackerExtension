@@ -136,6 +136,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       extractedData = response.data;
       await loadEmails();
       await populateForm(extractedData);
+      // Auto-apply cached AI extraction if available
+      const cached = await getAiCache(extractedData.url);
+      if (cached) {
+        applyAiData(cached);
+      }
+      updateAiExtractBar();
       loadingEl.style.display = "none";
       formEl.style.display = "block";
       document.getElementById("open-tab-bar").style.display = "block";
@@ -263,6 +269,13 @@ function setupEventListeners() {
   document.getElementById("open-tab-btn").addEventListener("click", () => {
     openInTab();
   });
+
+  const aiExtractBtn = document.getElementById("ai-extract-btn");
+  if (aiExtractBtn) {
+    aiExtractBtn.addEventListener("click", async () => {
+      await runAiExtraction();
+    });
+  }
 
   const autofillBtn = document.getElementById("autofill-btn");
   if (autofillBtn) {
@@ -446,5 +459,141 @@ async function saveApplication(forceSave) {
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = "Confirm & Save";
+  }
+}
+
+// --- AI extraction helpers ---
+async function getAiCache(url) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(["aiExtractCache"], (result) => {
+      const cache = result.aiExtractCache || {};
+      resolve(cache[url] || null);
+    });
+  });
+}
+
+async function setAiCache(url, data) {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(["aiExtractCache"], (result) => {
+      const cache = result.aiExtractCache || {};
+      cache[url] = data;
+      // Keep cache small: max 50 entries
+      const keys = Object.keys(cache);
+      if (keys.length > 50) {
+        delete cache[keys[0]];
+      }
+      chrome.storage.local.set({ aiExtractCache: cache }, () => resolve());
+    });
+  });
+}
+
+function getFieldValue(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : "";
+}
+
+function setFieldValue(id, value) {
+  const el = document.getElementById(id);
+  if (el && value) {
+    if (el.value.trim() === "") {
+      el.value = value;
+    }
+  }
+}
+
+function isIncomplete() {
+  return getFieldValue("job_role") === "" || getFieldValue("company_name") === "";
+}
+
+function updateAiExtractBar() {
+  const bar = document.getElementById("ai-extract-bar");
+  if (!bar) return;
+  if (isIncomplete()) {
+    bar.style.display = "block";
+  } else {
+    bar.style.display = "none";
+  }
+}
+
+function applyAiData(aiData) {
+  if (!aiData) return;
+  setFieldValue("job_role", aiData.job_role);
+  setFieldValue("company_name", aiData.company_name);
+  setFieldValue("location", aiData.location);
+  if (aiData.salary_range) {
+    const salaryEl = document.getElementById("salary_range");
+    if (salaryEl && salaryEl.value.trim() === "") {
+      salaryEl.value = formatSalaryRange(aiData.salary_range);
+    }
+  }
+  setFieldValue("job_description", aiData.job_description);
+  if (aiData.employment_type) {
+    const typeSelect = document.getElementById("employment_type");
+    if (typeSelect && typeSelect.value === "") {
+      const option = Array.from(typeSelect.options).find((opt) => opt.value === aiData.employment_type);
+      if (option) typeSelect.value = aiData.employment_type;
+    }
+  }
+  if (aiData.application_platform) {
+    const platformSelect = document.getElementById("application_platform");
+    if (platformSelect) {
+      const option = Array.from(platformSelect.options).find((opt) => opt.value === aiData.application_platform);
+      if (option) platformSelect.value = aiData.application_platform;
+    }
+  }
+  updateAiExtractBar();
+}
+
+async function runAiExtraction() {
+  const btn = document.getElementById("ai-extract-btn");
+  const status = document.getElementById("ai-extract-status");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Extracting...";
+  }
+  if (status) status.textContent = "";
+
+  try {
+    // Get page text from content script
+    let pageText = "";
+    let pageUrl = "";
+    try {
+      const res = await chrome.tabs.sendMessage(currentTab.id, { action: "getPageText" });
+      if (res && res.success && res.data) {
+        pageText = res.data.text || "";
+        pageUrl = res.data.url || "";
+      }
+    } catch (e) {
+      // fallback to extractedData url
+      pageUrl = extractedData?.url || "";
+    }
+
+    if (!pageText) {
+      throw new Error("Could not read page text.");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/ai/extract`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: pageText, url: pageUrl }),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || "AI extraction failed.");
+    }
+
+    const aiData = result.data;
+    applyAiData(aiData);
+    if (pageUrl) await setAiCache(pageUrl, aiData);
+
+    if (status) status.textContent = "Done.";
+  } catch (err) {
+    if (status) status.textContent = `Failed: ${err.message}`;
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "✨ Extract with AI";
+    }
   }
 }
