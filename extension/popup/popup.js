@@ -141,10 +141,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (cached) {
         applyAiData(cached);
       }
+
+      // Capture-first: if current page extraction incomplete, try latest captured job
+      const captures = await getCaptures();
+      if (isIncomplete() && captures.length > 0) {
+        const latest = captures[captures.length - 1];
+        applyAiData(latest.data);
+        const status = document.getElementById("capture-status");
+        if (status) status.textContent = `Auto-filled from captured job: ${latest.data.job_role || ""} @ ${latest.data.company_name || ""}`;
+      }
+
       updateAiExtractBar();
+      renderCaptureSelect();
       loadingEl.style.display = "none";
       formEl.style.display = "block";
       document.getElementById("open-tab-bar").style.display = "block";
+      const captureBar = document.getElementById("capture-bar");
+      if (captureBar) captureBar.style.display = "block";
     } else {
       throw new Error(response?.error || "Failed to extract job data.");
     }
@@ -269,6 +282,30 @@ function setupEventListeners() {
   document.getElementById("open-tab-btn").addEventListener("click", () => {
     openInTab();
   });
+
+  const captureJobBtn = document.getElementById("capture-job-btn");
+  if (captureJobBtn) {
+    captureJobBtn.addEventListener("click", async () => {
+      await runCaptureJob();
+    });
+  }
+
+  const fillCaptureBtn = document.getElementById("fill-capture-btn");
+  if (fillCaptureBtn) {
+    fillCaptureBtn.addEventListener("click", async () => {
+      await fillFromCapture();
+    });
+  }
+
+  const clearCapturesBtn = document.getElementById("clear-captures-btn");
+  if (clearCapturesBtn) {
+    clearCapturesBtn.addEventListener("click", async () => {
+      await chrome.storage.local.remove(["pendingCaptures"]);
+      renderCaptureSelect();
+      const status = document.getElementById("capture-status");
+      if (status) status.textContent = "Captures cleared.";
+    });
+  }
 
   const aiExtractBtn = document.getElementById("ai-extract-btn");
   if (aiExtractBtn) {
@@ -596,4 +633,113 @@ async function runAiExtraction() {
       btn.textContent = "✨ Extract with AI";
     }
   }
+}
+
+// --- Capture-First helpers ---
+async function getCaptures() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(["pendingCaptures"], (result) => {
+      resolve(result.pendingCaptures || []);
+    });
+  });
+}
+
+async function saveCapture(data, url) {
+  const captures = await getCaptures();
+  const capture = {
+    id: Date.now().toString(),
+    url: url || data && null,
+    capturedAt: new Date().toISOString(),
+    data,
+  };
+  captures.push(capture);
+  // keep last 20
+  while (captures.length > 20) captures.shift();
+  await new Promise((resolve) => {
+    chrome.storage.local.set({ pendingCaptures: captures }, resolve);
+  });
+  return capture;
+}
+
+function renderCaptureSelect() {
+  const select = document.getElementById("capture-select");
+  if (!select) return;
+  getCaptures().then((captures) => {
+    select.innerHTML = "";
+    if (captures.length === 0) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "No captures yet";
+      select.appendChild(opt);
+      return;
+    }
+    captures.slice().reverse().forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      const label = `${c.data.job_role || "?"} @ ${c.data.company_name || "?"}`;
+      opt.textContent = `${label} (${new Date(c.capturedAt).toLocaleDateString()})`;
+      select.appendChild(opt);
+    });
+  });
+}
+
+async function runCaptureJob() {
+  const btn = document.getElementById("capture-job-btn");
+  const status = document.getElementById("capture-status");
+  if (btn) { btn.disabled = true; btn.textContent = "Capturing..."; }
+  if (status) status.textContent = "";
+
+  try {
+    // Reuse AI extraction pipeline
+    let pageText = "";
+    let pageUrl = "";
+    try {
+      const res = await chrome.tabs.sendMessage(currentTab.id, { action: "getPageText" });
+      if (res && res.success && res.data) {
+        pageText = res.data.text || "";
+        pageUrl = res.data.url || "";
+      }
+    } catch (e) {
+      pageUrl = extractedData?.url || "";
+    }
+
+    if (!pageText) throw new Error("Could not read page text.");
+
+    const response = await fetch(`${API_BASE_URL}/api/ai/extract`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: pageText, url: pageUrl }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) throw new Error(result.message || "AI extraction failed.");
+
+    const aiData = result.data;
+    // Also apply to form immediately
+    applyAiData(aiData);
+    await setAiCache(pageUrl, aiData);
+    const capture = await saveCapture(aiData, pageUrl);
+    renderCaptureSelect();
+
+    if (status) status.textContent = `Captured: ${aiData.job_role || "?"} @ ${aiData.company_name || "?"}`;
+  } catch (err) {
+    if (status) status.textContent = `Failed: ${err.message}`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "📸 Capture Job (AI)"; }
+  }
+}
+
+async function fillFromCapture() {
+  const select = document.getElementById("capture-select");
+  const status = document.getElementById("capture-status");
+  const id = select ? select.value : null;
+  const captures = await getCaptures();
+  let capture = null;
+  if (id) capture = captures.find((c) => c.id === id);
+  if (!capture && captures.length > 0) capture = captures[captures.length - 1];
+  if (!capture) {
+    if (status) status.textContent = "No captures available.";
+    return;
+  }
+  applyAiData(capture.data);
+  if (status) status.textContent = `Filled from: ${capture.data.job_role || "?"} @ ${capture.data.company_name || "?"}`;
 }

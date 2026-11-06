@@ -25,6 +25,17 @@
       <span id="ai-extract-status" style="margin-left: 8px; font-size: 12px;"></span>
     </div>
 
+    <div id="capture-bar" style="display: none; margin-bottom: 12px; padding: 8px; border: 1px dashed #999; border-radius: 6px;">
+      <div style="margin-bottom: 6px; font-size: 12px; font-weight: 600;">Captured Jobs</div>
+      <select id="capture-select" style="width: 100%; margin-bottom: 6px;"></select>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <button type="button" id="capture-job-btn" class="btn btn-secondary btn-sm">📸 Capture Job (AI)</button>
+        <button type="button" id="fill-capture-btn" class="btn btn-secondary btn-sm">⬇️ Fill from Capture</button>
+        <button type="button" id="clear-captures-btn" class="btn btn-ghost btn-sm">Clear</button>
+      </div>
+      <span id="capture-status" style="display: block; margin-top: 6px; font-size: 12px;"></span>
+    </div>
+
     <div id="error" class="error" style="display: none;">
       <p id="error-message"></p>
     </div>
