@@ -101,12 +101,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       errorMessageEl.textContent = "Job Tracker backend not found. Reopen the extension popup to set the backend URL.";
       return;
     }
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs && tabs[0]) currentTab = tabs[0];
     const saved = await getSavedFormData();
     if (saved) {
       await loadEmails();
       restoreFormFromData(saved);
       loadingEl.style.display = "none";
       formEl.style.display = "block";
+      const captureBar = document.getElementById("capture-bar");
+      if (captureBar) captureBar.style.display = "block";
+      renderCaptureSelect();
     } else {
       loadingEl.style.display = "none";
       errorEl.style.display = "block";
@@ -216,6 +221,27 @@ async function populateForm(data) {
         typeSelect.value = data.employment_type;
       }
     }
+  }
+  await applyDefaultEmail();
+}
+
+async function applyDefaultEmail() {
+  const emailSelect = document.getElementById("application_email");
+  if (!emailSelect) return;
+  if (emailSelect.value.trim() !== "") return;
+  const stored = await new Promise((resolve) =>
+    chrome.storage.local.get(["default_email", "last_used_email"], (r) => resolve(r))
+  );
+  const email = stored.default_email || stored.last_used_email || "";
+  if (email) {
+    // ensure option exists
+    if (!Array.from(emailSelect.options).some((o) => o.value === email)) {
+      const opt = document.createElement("option");
+      opt.value = email;
+      opt.textContent = email;
+      emailSelect.appendChild(opt);
+    }
+    emailSelect.value = email;
   }
 }
 
@@ -349,6 +375,9 @@ function setupEventListeners() {
     document.getElementById("duplicate-warning").style.display = "none";
 
     document.getElementById("setting_api_url").value = API_BASE_URL;
+    chrome.storage.local.get(["default_email"], (result) => {
+      document.getElementById("setting_default_email").value = result.default_email || "";
+    });
     document.getElementById("settings-warning").style.display = "none";
     document.getElementById("settings-panel").style.display = "block";
   });
@@ -376,6 +405,9 @@ function setupEventListeners() {
 
     await chrome.storage.local.set({ api_url: newUrl });
     API_BASE_URL = newUrl;
+
+    const defaultEmail = document.getElementById("setting_default_email").value.trim();
+    await chrome.storage.local.set({ default_email: defaultEmail });
 
     document.getElementById("settings-panel").style.display = "none";
     location.reload();
@@ -487,6 +519,11 @@ async function saveApplication(forceSave) {
     }
 
     await clearSavedFormData();
+    if (data.application_email) {
+      await new Promise((resolve) =>
+        chrome.storage.local.set({ last_used_email: data.application_email }, resolve)
+      );
+    }
     document.getElementById("job-form").style.display = "none";
     document.getElementById("success").style.display = "block";
 
@@ -552,28 +589,37 @@ function updateAiExtractBar() {
   }
 }
 
-function applyAiData(aiData) {
+function applyAiData(aiData, options = {}) {
+  const overwrite = !!options.overwrite;
   if (!aiData) return;
-  setFieldValue("job_role", aiData.job_role);
-  setFieldValue("company_name", aiData.company_name);
-  setFieldValue("location", aiData.location);
+  const setField = (id, value) => {
+    if (value == null) return;
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (overwrite || el.value.trim() === "") {
+      el.value = value;
+    }
+  };
+  setField("job_role", aiData.job_role);
+  setField("company_name", aiData.company_name);
+  setField("location", aiData.location);
   if (aiData.salary_range) {
     const salaryEl = document.getElementById("salary_range");
-    if (salaryEl && salaryEl.value.trim() === "") {
+    if (salaryEl && (overwrite || salaryEl.value.trim() === "")) {
       salaryEl.value = formatSalaryRange(aiData.salary_range);
     }
   }
-  setFieldValue("job_description", aiData.job_description);
+  setField("job_description", aiData.job_description);
   if (aiData.employment_type) {
     const typeSelect = document.getElementById("employment_type");
-    if (typeSelect && typeSelect.value === "") {
+    if (typeSelect && (overwrite || typeSelect.value === "")) {
       const option = Array.from(typeSelect.options).find((opt) => opt.value === aiData.employment_type);
       if (option) typeSelect.value = aiData.employment_type;
     }
   }
   if (aiData.application_platform) {
     const platformSelect = document.getElementById("application_platform");
-    if (platformSelect) {
+    if (platformSelect && (overwrite || platformSelect.value === "")) {
       const option = Array.from(platformSelect.options).find((opt) => opt.value === aiData.application_platform);
       if (option) platformSelect.value = aiData.application_platform;
     }
@@ -582,6 +628,11 @@ function applyAiData(aiData) {
 }
 
 async function runAiExtraction() {
+  if (!currentTab) {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs && tabs[0]) currentTab = tabs[0];
+  }
+  if (!currentTab) throw new Error("No active tab.");
   const btn = document.getElementById("ai-extract-btn");
   const status = document.getElementById("ai-extract-status");
   if (btn) {
@@ -593,15 +644,16 @@ async function runAiExtraction() {
   try {
     // Get page text from content script
     let pageText = "";
+    let pageJsonLd = null;
     let pageUrl = "";
     try {
       const res = await chrome.tabs.sendMessage(currentTab.id, { action: "getPageText" });
       if (res && res.success && res.data) {
         pageText = res.data.text || "";
+        pageJsonLd = res.data.jsonLd || null;
         pageUrl = res.data.url || "";
       }
     } catch (e) {
-      // fallback to extractedData url
       pageUrl = extractedData?.url || "";
     }
 
@@ -612,7 +664,7 @@ async function runAiExtraction() {
     const response = await fetch(`${API_BASE_URL}/api/ai/extract`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: pageText, url: pageUrl }),
+      body: JSON.stringify({ text: pageText, jsonLd: pageJsonLd, url: pageUrl }),
     });
 
     const result = await response.json();
@@ -684,6 +736,15 @@ function renderCaptureSelect() {
 }
 
 async function runCaptureJob() {
+  if (!currentTab) {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tabs && tabs[0]) currentTab = tabs[0];
+  }
+  if (!currentTab) {
+    const status = document.getElementById("capture-status");
+    if (status) status.textContent = "No active tab.";
+    return;
+  }
   const btn = document.getElementById("capture-job-btn");
   const status = document.getElementById("capture-status");
   if (btn) { btn.disabled = true; btn.textContent = "Capturing..."; }
@@ -692,11 +753,13 @@ async function runCaptureJob() {
   try {
     // Reuse AI extraction pipeline
     let pageText = "";
+    let pageJsonLd = null;
     let pageUrl = "";
     try {
       const res = await chrome.tabs.sendMessage(currentTab.id, { action: "getPageText" });
       if (res && res.success && res.data) {
         pageText = res.data.text || "";
+        pageJsonLd = res.data.jsonLd || null;
         pageUrl = res.data.url || "";
       }
     } catch (e) {
@@ -708,14 +771,14 @@ async function runCaptureJob() {
     const response = await fetch(`${API_BASE_URL}/api/ai/extract`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: pageText, url: pageUrl }),
+      body: JSON.stringify({ text: pageText, jsonLd: pageJsonLd, url: pageUrl }),
     });
     const result = await response.json();
     if (!response.ok || !result.success) throw new Error(result.message || "AI extraction failed.");
 
     const aiData = result.data;
     // Also apply to form immediately
-    applyAiData(aiData);
+    applyAiData(aiData, { overwrite: true });
     await setAiCache(pageUrl, aiData);
     const capture = await saveCapture(aiData, pageUrl);
     renderCaptureSelect();
@@ -740,6 +803,8 @@ async function fillFromCapture() {
     if (status) status.textContent = "No captures available.";
     return;
   }
-  applyAiData(capture.data);
+  const ok = confirm("Overwrite form fields with captured data?");
+  if (!ok) return;
+  applyAiData(capture.data, { overwrite: true });
   if (status) status.textContent = `Filled from: ${capture.data.job_role || "?"} @ ${capture.data.company_name || "?"}`;
 }
