@@ -80,68 +80,88 @@ function sanitizeExtracted(obj) {
 
 exports.extract = async (req, res) => {
   try {
-    const { text, url } = req.body || {};
+    const { text, jsonLd, url } = req.body || {};
     const rawText = String(text || "").trim();
     if (!rawText) {
       return res.status(400).json({ success: false, message: "text is required." });
     }
 
-    // Prioritise top of page; cap to avoid token overflow.
     const truncated = rawText.slice(0, 6000);
+    const jsonLdStr = jsonLd ? JSON.stringify(jsonLd).slice(0, 4000) : "";
 
     const systemPrompt =
       "You extract job posting fields from the provided page text. " +
       "Return ONLY a valid JSON object with exactly these keys: " +
       "job_role, company_name, location, salary_range, employment_type, job_description, application_platform. " +
       "Use null for any field not present in the text. Never invent facts. " +
+      "Prefer structured JSON-LD data if provided. Focus on the PRIMARY job matching the URL. " +
+      "Ignore lists of other jobs or recommendations. " +
       "job_description must be a concise excerpt (max 500 chars) from the text, not a rewrite. " +
       "No markdown, no preamble, JSON only.";
 
-    const userContent = `URL: ${String(url || "")}\n\nPAGE TEXT:\n${truncated}`;
+    const userContent =
+      `URL: ${String(url || "")}\n\n` +
+      (jsonLdStr ? `JSON-LD:\n${jsonLdStr}\n\n` : "") +
+      `PAGE TEXT:\n${truncated}`;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-
-    let ollamaRes;
-    try {
-      ollamaRes = await fetch(`${OLLAMA_URL}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: MODEL,
-          stream: false,
-          format: "json",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userContent },
-          ],
-          options: { temperature: 0, num_predict: 400, num_ctx: 4096 },
-        }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeout);
+    async function callModel(extraUser = "") {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      try {
+        const ollamaRes = await fetch(`${OLLAMA_URL}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: MODEL,
+            stream: false,
+            format: "json",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userContent + (extraUser ? "\n\n" + extraUser : "") },
+            ],
+            options: { temperature: 0, num_predict: 400, num_ctx: 4096 },
+          }),
+          signal: controller.signal,
+        });
+        if (!ollamaRes.ok) {
+          throw new Error("Ollama error: " + ollamaRes.status);
+        }
+        const data = await ollamaRes.json();
+        let content = data.message?.content?.trim() || "";
+        content = content.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
+        return JSON.parse(content);
+      } finally {
+        clearTimeout(timeout);
+      }
     }
-
-    if (!ollamaRes.ok) {
-      return res.status(502).json({ success: false, message: "Ollama error: " + ollamaRes.status });
-    }
-
-    const data = await ollamaRes.json();
-    let content = data.message?.content?.trim() || "";
-
-    // Strip possible code fences just in case.
-    content = content.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
 
     let parsed;
     try {
-      parsed = JSON.parse(content);
+      parsed = await callModel();
     } catch (e) {
-      // Retry once with stricter reminder is not possible here; return failure.
-      return res.status(502).json({ success: false, message: "Invalid JSON from model: " + e.message });
+      return res.status(502).json({ success: false, message: e.message });
     }
 
-    const extracted = sanitizeExtracted(parsed);
+    let extracted = sanitizeExtracted(parsed);
+
+    // Multi-pass: retry once for critical null fields with focused prompt.
+    if (!extracted.job_role || !extracted.company_name) {
+      try {
+        const retryParsed = await callModel(
+          "The previous extraction missed job_role or company_name. Re-extract carefully from the text above. Return the same JSON keys."
+        );
+        const retryExtracted = sanitizeExtracted(retryParsed);
+        // Only fill fields that were null
+        for (const key of EXTRACT_KEYS) {
+          if (extracted[key] == null && retryExtracted[key] != null) {
+            extracted[key] = retryExtracted[key];
+          }
+        }
+      } catch (e) {
+        // ignore retry failure
+      }
+    }
+
     return res.json({ success: true, data: extracted });
   } catch (err) {
     const msg = err.name === "AbortError" ? "Extraction timed out." : err.message;

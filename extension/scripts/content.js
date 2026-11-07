@@ -11,11 +11,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
   if (request.action === "getPageText") {
     try {
-      const text = (document.body && document.body.innerText) ? document.body.innerText : "";
+      const jsonLd = collectJobJsonLd();
+      const container = findJobDetailContainer();
+      const text = container ? container.innerText : (document.body ? document.body.innerText : "");
       sendResponse({
         success: true,
         data: {
           text: text.slice(0, 8000),
+          jsonLd,
           url: window.location.href,
           title: document.title || "",
         },
@@ -346,6 +349,8 @@ function parseIndeed(data) {
     "a[class*='CompanyInfo']",
     "a[href*='/cmp/']",
     "span[data-testid='company-name']",
+    "div[data-testid='inlineHeader-companyName'] a",
+    "div.jobsearch-JobInfoHeader-companyNameSimple a",
   ]);
   if (companyEl) data.company = getText(companyEl);
 
@@ -503,4 +508,43 @@ function normalizeEmploymentType(type) {
   if (lower.includes("freelanc")) return "Freelance";
   if (lower.includes("temporary") || lower.includes("temp")) return "Contract";
   return type;
+}
+
+// --- Helpers for AI extraction context ---
+function collectJobJsonLd() {
+  const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+  const results = [];
+  for (const s of scripts) {
+    try {
+      const json = JSON.parse(s.textContent);
+      const items = Array.isArray(json) ? json : [json];
+      for (const item of items) {
+        if (item && (item["@type"] === "JobPosting" || item["@type"] === "Job")) {
+          results.push(item);
+        }
+      }
+    } catch {}
+  }
+  return results.length ? results : null;
+}
+
+function findJobDetailContainer() {
+  const selectors = [
+    "#viewJobSSRRoot",
+    ".jobsearch-ViewJobLayout-jobDisplay",
+    ".jobsearch-jobDescriptionText",
+    "[data-testid='jobsearch-JobComponent']",
+    "main",
+    "[role='main']",
+    "article",
+    ".job-details",
+    ".job-description",
+  ];
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el && el.innerText && el.innerText.trim().length > 200) {
+      return el;
+    }
+  }
+  return null;
 }
