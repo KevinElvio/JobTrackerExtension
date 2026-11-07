@@ -61,6 +61,18 @@ const EXTRACT_KEYS = [
   "application_platform",
 ];
 
+function normalizeEmploymentType(type) {
+  if (!type) return null;
+  const lower = String(type).toLowerCase();
+  if (lower.includes("intern")) return "Internship";
+  if (lower.includes("full")) return "Full Time";
+  if (lower.includes("part")) return "Part Time";
+  if (lower.includes("contract")) return "Contract";
+  if (lower.includes("freelanc")) return "Freelance";
+  if (lower.includes("temporary") || lower.includes("temp")) return "Contract";
+  return String(type).trim() || null;
+}
+
 function sanitizeExtracted(obj) {
   const out = {};
   for (const key of EXTRACT_KEYS) {
@@ -69,9 +81,11 @@ function sanitizeExtracted(obj) {
     if (typeof val === "string") {
       val = val.trim();
       if (key === "job_description" && val.length > 500) val = val.slice(0, 500);
+      if (key === "employment_type") val = normalizeEmploymentType(val);
       if (val === "") val = null;
     } else if (val !== null && typeof val !== "string") {
       val = String(val).trim() || null;
+      if (key === "employment_type") val = normalizeEmploymentType(val);
     }
     out[key] = val;
   }
