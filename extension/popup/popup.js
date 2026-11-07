@@ -107,6 +107,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (saved) {
       await loadEmails();
       restoreFormFromData(saved);
+      await applyDefaultEmail();
       loadingEl.style.display = "none";
       formEl.style.display = "block";
       const captureBar = document.getElementById("capture-bar");
