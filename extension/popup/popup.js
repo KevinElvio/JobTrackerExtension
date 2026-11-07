@@ -395,6 +395,35 @@ function setupEventListeners() {
     }
   });
 
+  const testBackendBtn = document.getElementById("test-backend-btn");
+  if (testBackendBtn) {
+    testBackendBtn.addEventListener("click", async () => {
+      const url = document.getElementById("setting_api_url").value.trim() || DEFAULT_API_URL;
+      const resultEl = document.getElementById("settings-test-result");
+      if (resultEl) resultEl.textContent = "Testing...";
+      try {
+        const healthRes = await fetch(`${url}/health`);
+        if (!healthRes.ok) throw new Error("Health check failed: " + healthRes.status);
+        const health = await healthRes.json();
+        if (health?.status !== "ok") throw new Error("Health status not ok.");
+        const extractRes = await fetch(`${url}/api/ai/extract`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: "Software Engineer at Acme Corp in Austin TX", url: "https://example.com" }),
+        });
+        const ct = extractRes.headers.get("content-type") || "";
+        if (!ct.includes("application/json")) {
+          throw new Error("Extract route returned non-JSON (backend not updated/restarted).");
+        }
+        const data = await extractRes.json();
+        if (!data.success) throw new Error(data.message || "Extract failed.");
+        if (resultEl) resultEl.textContent = "OK: backend & extract route working.";
+      } catch (err) {
+        if (resultEl) resultEl.textContent = "FAIL: " + err.message;
+      }
+    });
+  }
+
   document.getElementById("save-settings-btn").addEventListener("click", async () => {
     const newUrl = document.getElementById("setting_api_url").value.trim() || DEFAULT_API_URL;
     document.getElementById("settings-warning").style.display = "none";
@@ -668,6 +697,15 @@ async function runAiExtraction() {
       body: JSON.stringify({ text: pageText, jsonLd: pageJsonLd, url: pageUrl }),
     });
 
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      const text = await response.text();
+      throw new Error(
+        "Backend returned non-JSON (check Backend URL / restart backend). " +
+        text.slice(0, 120).replace(/\s+/g, " ")
+      );
+    }
+
     const result = await response.json();
     if (!response.ok || !result.success) {
       throw new Error(result.message || "AI extraction failed.");
@@ -774,6 +812,14 @@ async function runCaptureJob() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: pageText, jsonLd: pageJsonLd, url: pageUrl }),
     });
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      const text = await response.text();
+      throw new Error(
+        "Backend returned non-JSON (check Backend URL / restart backend). " +
+        text.slice(0, 120).replace(/\s+/g, " ")
+      );
+    }
     const result = await response.json();
     if (!response.ok || !result.success) throw new Error(result.message || "AI extraction failed.");
 

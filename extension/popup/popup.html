@@ -159,9 +159,11 @@
         Backend not reachable at this URL. Make sure Docker is running, then try again.
       </p>
       <div class="form-actions">
+        <button type="button" id="test-backend-btn" class="btn btn-ghost">Test Backend</button>
         <button type="button" id="cancel-settings-btn" class="btn btn-secondary">Cancel</button>
         <button type="button" id="save-settings-btn" class="btn btn-primary">Save Settings</button>
       </div>
+      <p id="settings-test-result" style="font-size: 12px; margin-top: 6px;"></p>
     </div>
 
     <div id="success" style="display: none;">
