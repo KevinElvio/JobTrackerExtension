@@ -383,6 +383,7 @@ function parseIndeed(data) {
     "div[class*='jobDescriptionText']",
     "div[class*='JobDescription']",
     "div#jobDescriptionText",
+    "div.jobsearch-ViewJobLayout-jobDisplay div[class*='description']",
   ]);
   if (descEl) data.description = getText(descEl);
 

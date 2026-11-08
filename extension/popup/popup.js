@@ -760,6 +760,12 @@ async function runCaptureJob() {
     if (!response.ok || !result.success) throw new Error(result.message || "AI extraction failed.");
 
     applyAiData(result.data, { overwrite: true });
+    // Fallback deskripsi: jika kosong, gunakan teks halaman (detail container) tanpa noise.
+    const descEl = document.getElementById("job_description");
+    if (descEl && descEl.value.trim() === "") {
+      const fallback = result.data.job_description || pageText;
+      if (fallback) descEl.value = fallback.slice(0, 10000);
+    }
     await setAiCache(pageUrl, result.data);
     if (status) status.textContent = `Captured: ${result.data.job_role || "?"} @ ${result.data.company_name || "?"}`;
   } catch (err) {
