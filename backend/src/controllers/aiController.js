@@ -84,7 +84,7 @@ function sanitizeExtracted(obj) {
     if (val === undefined) val = null;
     if (typeof val === "string") {
       val = val.trim();
-      if (key === "job_description" && val.length > 500) val = val.slice(0, 500);
+      if (key === "job_description" && val.length > 5000) val = val.slice(0, 5000);
       if (key === "employment_type") val = normalizeEmploymentType(val);
       if (val === "") val = null;
     } else if (val !== null && typeof val !== "string") {
@@ -114,7 +114,7 @@ exports.extract = async (req, res) => {
       "Use null for any field not present in the text. Never invent facts. " +
       "Prefer structured JSON-LD data if provided. Focus on the PRIMARY job matching the URL. " +
       "Ignore lists of other jobs or recommendations. " +
-      "job_description must be a concise excerpt (max 500 chars) from the text, not a rewrite. " +
+      "job_description can be a longer excerpt (up to 5000 chars) from the text if available. " +
       "No markdown, no preamble, JSON only.";
 
     const userContent =

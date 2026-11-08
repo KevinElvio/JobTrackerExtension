@@ -626,7 +626,7 @@ function applyAiData(aiData, options = {}) {
       salaryEl.value = formatSalaryRange(aiData.salary_range);
     }
   }
-  setField("job_description", aiData.job_description);
+  // job_description sengaja tidak ditimpa AI agar tetap lengkap dari DOM.
   if (aiData.employment_type) {
     const typeSelect = document.getElementById("employment_type");
     if (typeSelect && (overwrite || typeSelect.value === "")) {
