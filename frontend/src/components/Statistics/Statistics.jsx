@@ -4,13 +4,17 @@ import { StatusChart, HorizontalBarChart, EmploymentChart, MonthlyChart, BigDail
 
 function pad(n) { return String(n).padStart(2, "0"); }
 
+function heatColor(count, dark) {
+  if (count <= 0) return dark ? "#161b22" : "#ebedf0";
+  if (count === 1) return "#9be9a8";
+  if (count <= 3) return "#40c463";
+  if (count <= 6) return "#30a14e";
+  return "#216e39";
+}
+
 export default function Statistics() {
   const [stats, setStats] = useState(null);
   const [apps, setApps] = useState([]);
-  const [month, setMonth] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-  });
   const [selectedDate, setSelectedDate] = useState(null);
 
   const loadData = useCallback(async () => {
@@ -31,31 +35,25 @@ export default function Statistics() {
     return acc;
   }, {});
 
-  const [y, m] = month.split("-").map(Number);
-  const firstDay = new Date(y, m - 1, 1);
-  const lastDay = new Date(y, m, 0);
-  const startWeekday = firstDay.getDay(); // 0=Sun
-  const daysInMonth = lastDay.getDate();
+  const today = new Date();
+  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const start = new Date(end);
+  start.setDate(start.getDate() - 364);
+  start.setDate(start.getDate() - start.getDay()); // align to Sunday
 
-  const cells = [];
-  for (let i = 0; i < startWeekday; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${y}-${pad(m)}-${pad(d)}`;
-    cells.push({ day: d, date: dateStr, count: (byDate[dateStr] || []).length });
+  const days = [];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    days.push({ date: dateStr, count: (byDate[dateStr] || []).length });
   }
+  // pad last week to 7
+  while (days.length % 7 !== 0) days.push(null);
 
+  const weeks = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+
+  const dark = document.documentElement.getAttribute("data-theme") === "dark";
   const selectedApps = selectedDate ? (byDate[selectedDate] || []) : [];
-
-  const prevMonth = () => {
-    const d = new Date(y, m - 2, 1);
-    setMonth(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`);
-    setSelectedDate(null);
-  };
-  const nextMonth = () => {
-    const d = new Date(y, m, 1);
-    setMonth(`${d.getFullYear()}-${pad(d.getMonth() + 1)}`);
-    setSelectedDate(null);
-  };
 
   return (
     <div className="page active">
@@ -71,35 +69,40 @@ export default function Statistics() {
       <div className="chart-box chart-full"><h3>Daily Applications</h3><BigDailyChart data={stats.daily} id="chart-stat-daily" /></div>
 
       <div className="chart-box chart-full">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <button className="btn btn-ghost btn-sm" onClick={prevMonth}>&larr; Prev</button>
-          <h3 style={{ margin: 0 }}>Calendar: {month}</h3>
-          <button className="btn btn-ghost btn-sm" onClick={nextMonth}>Next &rarr;</button>
+        <h3>Activity (last 1 year)</h3>
+        <div style={{ overflowX: "auto", paddingBottom: 8 }}>
+          <div style={{ display: "grid", gridTemplateRows: "repeat(7, 12px)", gridAutoFlow: "column", gap: 3, width: "max-content" }}>
+            {weeks.map((week, wi) =>
+              week.map((day, di) =>
+                day ? (
+                  <button
+                    key={day.date}
+                    type="button"
+                    title={`${day.date}: ${day.count} application(s)`}
+                    onClick={() => setSelectedDate(day.date)}
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: 2,
+                      border: "none",
+                      background: heatColor(day.count, dark),
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                  />
+                ) : (
+                  <div key={`empty-${wi}-${di}`} style={{ width: 12, height: 12 }} />
+                )
+              )
+            )}
+          </div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, textAlign: "center", fontSize: 12 }}>
-          {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d) => (
-            <div key={d} style={{ fontWeight: 600, padding: 4 }}>{d}</div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11, marginTop: 8, color: "var(--text-secondary)" }}>
+          <span>Less</span>
+          {[0, 1, 2, 4, 7].map((c) => (
+            <span key={c} style={{ width: 12, height: 12, borderRadius: 2, background: heatColor(c, dark), display: "inline-block" }} />
           ))}
-          {cells.map((c, idx) => (
-            <button
-              key={idx}
-              type="button"
-              disabled={!c}
-              onClick={() => c && setSelectedDate(c.date)}
-              style={{
-                padding: 6,
-                borderRadius: 6,
-                border: "1px solid var(--border, #e2e8f0)",
-                background: c ? (c.count > 0 ? "rgba(59,130,246,0.15)" : "transparent") : "transparent",
-                cursor: c ? "pointer" : "default",
-                opacity: c ? 1 : 0,
-                fontWeight: c && c.count > 0 ? 700 : 400,
-              }}
-            >
-              {c ? c.day : ""}
-              {c && c.count > 0 && <div style={{ fontSize: 10, color: "#3b82f6" }}>{c.count}</div>}
-            </button>
-          ))}
+          <span>More</span>
         </div>
 
         <div style={{ marginTop: 16 }}>
