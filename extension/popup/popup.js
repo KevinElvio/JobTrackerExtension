@@ -1,4 +1,4 @@
-const DEFAULT_API_URL = "http://localhost:8000";
+const DEFAULT_API_URL = "http://localhost:8002";
 
 let API_BASE_URL = DEFAULT_API_URL;
 
@@ -32,7 +32,12 @@ async function probeApi(url) {
     const res = await fetch(`${url}/health`, { signal: controller.signal });
     if (!res.ok) return false;
     const data = await res.json();
-    return data?.status === "ok";
+    if (data?.status !== "ok") return false;
+    // Ensure backend has AI extract route (not an old backend).
+    const aiRes = await fetch(`${url}/api/ai/health`, { signal: controller.signal });
+    if (!aiRes.ok) return false;
+    const aiData = await aiRes.json();
+    return aiData?.success === true;
   } catch {
     return false;
   } finally {
@@ -45,7 +50,9 @@ async function resolveApiBaseUrl() {
     chrome.storage.local.get(["api_url"], (result) => resolve(result.api_url || null))
   );
 
-  const candidates = stored ? [stored, DEFAULT_API_URL] : [DEFAULT_API_URL];
+  const candidates = stored
+    ? [stored, DEFAULT_API_URL, "http://localhost:8002", "http://localhost:8000"]
+    : [DEFAULT_API_URL, "http://localhost:8002", "http://localhost:8000"];
   for (const candidate of candidates) {
     if (await probeApi(candidate)) {
       API_BASE_URL = candidate;

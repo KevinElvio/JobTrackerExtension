@@ -3,6 +3,10 @@ const config = require("../config");
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const MODEL = process.env.OLLAMA_MODEL || "qwen2.5-coder:3b";
 
+exports.health = (_req, res) => {
+  return res.json({ success: true, data: { status: "ok", model: MODEL } });
+};
+
 exports.generate = async (req, res) => {
   try {
     const { question, job_context, personal_context } = req.body || {};
