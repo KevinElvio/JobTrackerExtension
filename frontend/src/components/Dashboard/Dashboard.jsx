@@ -6,6 +6,9 @@ import { StatusChart, PlatformChart, EmploymentChart, DailyChart } from "./MiniC
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [recent, setRecent] = useState([]);
+  const [todayApps, setTodayApps] = useState([]);
+
+  const today = new Date().toISOString().slice(0, 10);
 
   const loadData = useCallback(async () => {
     const [statsRes, appsRes] = await Promise.all([api.getStatistics(), api.getApplications()]);
@@ -13,8 +16,9 @@ export default function Dashboard() {
     if (appsRes.success) {
       const sorted = [...appsRes.data].sort((a, b) => (b.date_applied || "").localeCompare(a.date_applied || ""));
       setRecent(sorted.slice(0, 5));
+      setTodayApps(appsRes.data.filter((a) => a.date_applied === today));
     }
-  }, []);
+  }, [today]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -48,6 +52,22 @@ export default function Dashboard() {
       </div>
 
       <div className="chart-box chart-full"><h3>Daily Applications</h3><DailyChart data={stats.daily} /></div>
+
+      <div className="recent-section">
+        <h3>Today's Applications ({today})</h3>
+        <div className="recent-list">
+          {todayApps.length === 0 && <p style={{ color: "var(--text-secondary)", fontSize: 13 }}>No applications today</p>}
+          {todayApps.map((r) => (
+            <div key={r.application_id} className="recent-item">
+              <div className="recent-item-info">
+                <span className="recent-item-role">{r.job_role}</span>
+                <span className="recent-item-company">{r.company_name} &middot; {r.application_platform}</span>
+              </div>
+              <span className={`status-badge status-${(r.status || "").toLowerCase()}`}>{r.status}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className="recent-section">
         <h3>Recent Applications</h3>
