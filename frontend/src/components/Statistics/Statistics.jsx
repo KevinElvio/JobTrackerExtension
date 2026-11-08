@@ -12,6 +12,8 @@ function heatColor(count, dark) {
   return "#216e39";
 }
 
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
 export default function Statistics() {
   const [stats, setStats] = useState(null);
   const [apps, setApps] = useState([]);
@@ -39,18 +41,27 @@ export default function Statistics() {
   const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const start = new Date(end);
   start.setDate(start.getDate() - 364);
-  start.setDate(start.getDate() - start.getDay()); // align to Sunday
+  start.setDate(start.getDate() - start.getDay());
 
   const days = [];
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    days.push({ date: dateStr, count: (byDate[dateStr] || []).length });
+    days.push({ date: dateStr, count: (byDate[dateStr] || []).length, month: d.getMonth() });
   }
-  // pad last week to 7
   while (days.length % 7 !== 0) days.push(null);
 
   const weeks = [];
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+
+  const monthLabels = weeks.map((week, wi) => {
+    const firstValid = week.find((d) => d);
+    if (!firstValid) return "";
+    if (wi === 0) return MONTHS[firstValid.month];
+    const prevWeek = weeks[wi - 1];
+    const prevValid = prevWeek ? prevWeek.find((d) => d) : null;
+    if (prevValid && prevValid.month !== firstValid.month) return MONTHS[firstValid.month];
+    return "";
+  });
 
   const dark = document.documentElement.getAttribute("data-theme") === "dark";
   const selectedApps = selectedDate ? (byDate[selectedDate] || []) : [];
@@ -70,37 +81,55 @@ export default function Statistics() {
 
       <div className="chart-box chart-full">
         <h3>Activity (last 1 year)</h3>
-        <div style={{ overflowX: "auto", paddingBottom: 8 }}>
-          <div style={{ display: "grid", gridTemplateRows: "repeat(7, 12px)", gridAutoFlow: "column", gap: 3, width: "max-content" }}>
-            {weeks.map((week, wi) =>
-              week.map((day, di) =>
-                day ? (
-                  <button
-                    key={day.date}
-                    type="button"
-                    title={`${day.date}: ${day.count} application(s)`}
-                    onClick={() => setSelectedDate(day.date)}
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: 2,
-                      border: "none",
-                      background: heatColor(day.count, dark),
-                      cursor: "pointer",
-                      padding: 0,
-                    }}
-                  />
-                ) : (
-                  <div key={`empty-${wi}-${di}`} style={{ width: 12, height: 12 }} />
+        <div style={{ display: "flex", gap: 8, alignItems: "flex-start", overflowX: "auto", paddingBottom: 8 }}>
+          <div style={{ display: "grid", gridTemplateRows: "repeat(7, 14px)", gap: 3, fontSize: 10, color: "var(--text-secondary)", textAlign: "right", paddingTop: 18 }}>
+            <span />
+            <span>Mon</span>
+            <span />
+            <span>Wed</span>
+            <span />
+            <span>Fri</span>
+            <span />
+          </div>
+
+          <div>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${weeks.length}, 14px)`, gap: 3, marginBottom: 4, fontSize: 10, color: "var(--text-secondary)", height: 14 }}>
+              {monthLabels.map((m, i) => (
+                <span key={i} style={{ whiteSpace: "nowrap" }}>{m}</span>
+              ))}
+            </div>
+            <div style={{ display: "grid", gridTemplateRows: "repeat(7, 14px)", gridAutoFlow: "column", gap: 3, width: "max-content" }}>
+              {weeks.map((week, wi) =>
+                week.map((day, di) =>
+                  day ? (
+                    <button
+                      key={day.date}
+                      type="button"
+                      title={`${day.date}: ${day.count} application(s)`}
+                      onClick={() => setSelectedDate(day.date)}
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: 2,
+                        border: "none",
+                        background: heatColor(day.count, dark),
+                        cursor: "pointer",
+                        padding: 0,
+                      }}
+                    />
+                  ) : (
+                    <div key={`empty-${wi}-${di}`} style={{ width: 14, height: 14 }} />
+                  )
                 )
-              )
-            )}
+              )}
+            </div>
           </div>
         </div>
+
         <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11, marginTop: 8, color: "var(--text-secondary)" }}>
           <span>Less</span>
           {[0, 1, 2, 4, 7].map((c) => (
-            <span key={c} style={{ width: 12, height: 12, borderRadius: 2, background: heatColor(c, dark), display: "inline-block" }} />
+            <span key={c} style={{ width: 14, height: 14, borderRadius: 2, background: heatColor(c, dark), display: "inline-block" }} />
           ))}
           <span>More</span>
         </div>
