@@ -1,4 +1,4 @@
-const DEFAULT_API_URL = "http://localhost:8002";
+const DEFAULT_API_URL = "http://localhost:8000";
 
 let API_BASE_URL = DEFAULT_API_URL;
 
@@ -119,7 +119,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       formEl.style.display = "block";
       const captureBar = document.getElementById("capture-bar");
       if (captureBar) captureBar.style.display = "block";
-      renderCaptureSelect();
     } else {
       loadingEl.style.display = "none";
       errorEl.style.display = "block";
@@ -155,17 +154,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         applyAiData(cached);
       }
 
-      // Capture-first: if current page extraction incomplete, try latest captured job
-      const captures = await getCaptures();
-      if (isIncomplete() && captures.length > 0) {
-        const latest = captures[captures.length - 1];
-        applyAiData(latest.data);
-        const status = document.getElementById("capture-status");
-        if (status) status.textContent = `Auto-filled from captured job: ${latest.data.job_role || ""} @ ${latest.data.company_name || ""}`;
-      }
-
       updateAiExtractBar();
-      renderCaptureSelect();
       loadingEl.style.display = "none";
       formEl.style.display = "block";
       document.getElementById("open-tab-bar").style.display = "block";
@@ -264,8 +253,16 @@ async function loadEmails() {
     option.textContent = email;
     select.appendChild(option);
   });
+
+  const stored = await new Promise((resolve) =>
+    chrome.storage.local.get(["default_email", "last_used_email"], (r) => resolve(r))
+  );
+  const preferred = stored.default_email || stored.last_used_email || "";
+
   if (currentVal && emails.includes(currentVal)) {
     select.value = currentVal;
+  } else if (preferred && emails.includes(preferred)) {
+    select.value = preferred;
   } else if (emails.length) {
     select.value = emails[emails.length - 1];
   }
@@ -321,23 +318,6 @@ function setupEventListeners() {
   if (captureJobBtn) {
     captureJobBtn.addEventListener("click", async () => {
       await runCaptureJob();
-    });
-  }
-
-  const fillCaptureBtn = document.getElementById("fill-capture-btn");
-  if (fillCaptureBtn) {
-    fillCaptureBtn.addEventListener("click", async () => {
-      await fillFromCapture();
-    });
-  }
-
-  const clearCapturesBtn = document.getElementById("clear-captures-btn");
-  if (clearCapturesBtn) {
-    clearCapturesBtn.addEventListener("click", async () => {
-      await chrome.storage.local.remove(["pendingCaptures"]);
-      renderCaptureSelect();
-      const status = document.getElementById("capture-status");
-      if (status) status.textContent = "Captures cleared.";
     });
   }
 
@@ -733,54 +713,7 @@ async function runAiExtraction() {
   }
 }
 
-// --- Capture-First helpers ---
-async function getCaptures() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(["pendingCaptures"], (result) => {
-      resolve(result.pendingCaptures || []);
-    });
-  });
-}
-
-async function saveCapture(data, url) {
-  const captures = await getCaptures();
-  const capture = {
-    id: Date.now().toString(),
-    url: url || data && null,
-    capturedAt: new Date().toISOString(),
-    data,
-  };
-  captures.push(capture);
-  // keep last 20
-  while (captures.length > 20) captures.shift();
-  await new Promise((resolve) => {
-    chrome.storage.local.set({ pendingCaptures: captures }, resolve);
-  });
-  return capture;
-}
-
-function renderCaptureSelect() {
-  const select = document.getElementById("capture-select");
-  if (!select) return;
-  getCaptures().then((captures) => {
-    select.innerHTML = "";
-    if (captures.length === 0) {
-      const opt = document.createElement("option");
-      opt.value = "";
-      opt.textContent = "No captures yet";
-      select.appendChild(opt);
-      return;
-    }
-    captures.slice().reverse().forEach((c) => {
-      const opt = document.createElement("option");
-      opt.value = c.id;
-      const label = `${c.data.job_role || "?"} @ ${c.data.company_name || "?"}`;
-      opt.textContent = `${label} (${new Date(c.capturedAt).toLocaleDateString()})`;
-      select.appendChild(opt);
-    });
-  });
-}
-
+// --- Capture Job (AI) ---
 async function runCaptureJob() {
   if (!currentTab) {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -797,7 +730,6 @@ async function runCaptureJob() {
   if (status) status.textContent = "";
 
   try {
-    // Reuse AI extraction pipeline
     let pageText = "";
     let pageJsonLd = null;
     let pageUrl = "";
@@ -822,43 +754,17 @@ async function runCaptureJob() {
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
       const text = await response.text();
-      throw new Error(
-        "Backend returned non-JSON (check Backend URL / restart backend). " +
-        text.slice(0, 120).replace(/\s+/g, " ")
-      );
+      throw new Error("Backend returned non-JSON (check Backend URL / restart backend). " + text.slice(0, 120).replace(/\s+/g, " "));
     }
     const result = await response.json();
     if (!response.ok || !result.success) throw new Error(result.message || "AI extraction failed.");
 
-    const aiData = result.data;
-    // Also apply to form immediately
-    applyAiData(aiData, { overwrite: true });
-    await setAiCache(pageUrl, aiData);
-    const capture = await saveCapture(aiData, pageUrl);
-    renderCaptureSelect();
-
-    if (status) status.textContent = `Captured: ${aiData.job_role || "?"} @ ${aiData.company_name || "?"}`;
+    applyAiData(result.data, { overwrite: true });
+    await setAiCache(pageUrl, result.data);
+    if (status) status.textContent = `Captured: ${result.data.job_role || "?"} @ ${result.data.company_name || "?"}`;
   } catch (err) {
     if (status) status.textContent = `Failed: ${err.message}`;
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = "📸 Capture Job (AI)"; }
   }
-}
-
-async function fillFromCapture() {
-  const select = document.getElementById("capture-select");
-  const status = document.getElementById("capture-status");
-  const id = select ? select.value : null;
-  const captures = await getCaptures();
-  let capture = null;
-  if (id) capture = captures.find((c) => c.id === id);
-  if (!capture && captures.length > 0) capture = captures[captures.length - 1];
-  if (!capture) {
-    if (status) status.textContent = "No captures available.";
-    return;
-  }
-  const ok = confirm("Overwrite form fields with captured data?");
-  if (!ok) return;
-  applyAiData(capture.data, { overwrite: true });
-  if (status) status.textContent = `Filled from: ${capture.data.job_role || "?"} @ ${capture.data.company_name || "?"}`;
 }

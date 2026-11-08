@@ -101,7 +101,14 @@ Opsional — web app sudah berjalan tanpa extension.
 3. Klik **Load unpacked**, pilih folder `extension/`
 4. Buka halaman lowongan (LinkedIn/JobStreet/Indeed), klik ikon extension, lalu **Confirm & Save**
 
-Extension menyambung otomatis ke `http://localhost:8000` dan mem-probe endpoint `/health` saat dibuka. Jika backend Anda berjalan di address lain (misal `http://localhost:8000` di device berbeda), klik **⚙️ Settings** di popup dan isi URL-nya.
+Extension menyambung otomatis ke `http://localhost:8000` (lalu `http://localhost:8002` jika 8000 tidak tersedia) dan mem-probe endpoint `/health` + `/api/ai/health` saat dibuka.
+
+Fitur utama extension:
+- **Capture Job (AI)**: ekstrak info lowongan dari halaman (LinkedIn/JobStreet/Indeed/situs perusahaan) via Ollama, isi form recording, lalu Anda cek dan **Confirm & Save**.
+- **Default email terakhir dipakai**: email yang terakhir Anda gunakan akan otomatis terpilih; bisa di-set manual di Settings.
+- **Test Backend** di Settings untuk memastikan route AI tersedia.
+
+Jika backend Anda berjalan di address lain, klik **⚙️ Settings** di popup dan isi URL-nya.
 
 ---
 
@@ -126,6 +133,8 @@ Dibaca dari `backend/.env` (mode manual). Docker tidak butuh file ini — konfig
 | `PORT` | `8000` | Port server |
 | `CSV_FILE_PATH` | `./data/applications.csv` | File data applications |
 | `CSV_TEMPLATES_PATH` | `./data/templates.csv` | File data templates |
+| `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama base URL |
+| `OLLAMA_MODEL` | `qwen2.5-coder:3b` | Model for AI extraction/generation |
 
 ## API
 
@@ -149,6 +158,8 @@ Base URL: `http://localhost:8000`. Semua endpoint API ber-prefix `/api`.
 | PUT | `/api/templates/:id` | Update template |
 | DELETE | `/api/templates/:id` | Hapus template |
 | POST | `/api/templates/:id/render` | Render template (body: `{ "values": {...} }`) |
+| POST | `/api/ai/extract` | Extract job fields from page text via Ollama (body: `{ "text", "jsonLd", "url" }`) |
+| GET | `/api/ai/health` | AI route health check (used by extension) |
 
 Contoh body `POST /api/applications`:
 
